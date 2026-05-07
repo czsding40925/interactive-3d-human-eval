@@ -1,0 +1,27 @@
+# Runtime logs from the launchers
+*.log
+*.out
+
+# Python
+__pycache__/
+*.pyc
+
+# Participant data — contains initials/timestamps; bucket churns every session
+responses/
+
+# 3DGS checkpoints + per-iter PLY + stats (multi-GB, regenerable from training)
+runs_3dgs/
+
+# Reference media (~140 MB of training photos and slideshows)
+refs/
+
+# Legacy launchers / pre-rendered mp4s
+archive/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Local-only Claude reference — operational notes, kept out of the public repo
+CLAUDE.md

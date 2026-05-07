@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Render Evaluator — Convergence Rating (3DGS, interactive)</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0d0d0d; color: #ddd; font-family: system-ui, sans-serif;
+  display: flex; flex-direction: column; align-items: center;
+  min-height: 100vh; padding: 24px; gap: 18px;
+}
+h1 { font-size: 1.05rem; font-weight: 500; color: #aaa; letter-spacing: 0.05em; }
+h2 { font-size: 0.95rem; font-weight: 600; color: #ccc; }
+h3 { font-size: 0.8rem; font-weight: 600; color: #aaa; margin-bottom: 12px; }
+p, .meta { font-size: 0.82rem; color: #777; line-height: 1.6; }
+
+.welcome-page { padding-top: 60px; gap: 28px; }
+.welcome-page h1 { font-size: 2.1rem; font-weight: 600; color: #eee;
+                   letter-spacing: 0; line-height: 1.25; max-width: 780px;
+                   text-align: center; }
+.welcome-page h3 { font-size: 1.1rem; color: #ddd; margin-bottom: 14px;
+                   letter-spacing: 0; text-transform: none; }
+.welcome-page p { font-size: 1.05rem; color: #bbb; line-height: 1.7;
+                  max-width: 720px !important; }
+.welcome-page .q-block { max-width: 760px; }
+.welcome-page .btn { padding: 14px 44px; font-size: 1rem; }
+.welcome-page .pager { font-size: 0.85rem; color: #555;
+                       letter-spacing: 0.18em; text-transform: uppercase; }
+
+table.debrief-tbl { width: 100%; border-collapse: collapse; font-size: 0.92rem; color: #ccc; }
+table.debrief-tbl th, table.debrief-tbl td { padding: 8px 10px; text-align: left;
+  border-bottom: 1px solid #1c1c1c; }
+table.debrief-tbl th { color: #888; font-weight: 600; font-size: 0.78rem;
+  letter-spacing: 0.08em; text-transform: uppercase; }
+
+.screen { width: 100%; max-width: 1100px; display: flex; flex-direction: column;
+          align-items: center; gap: 14px; }
+.screen[hidden] { display: none; }
+
+.badge {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; padding: 3px 12px; border-radius: 99px;
+  background: #1c1c1c; color: #888;
+}
+
+.header-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+
+.view-row { display: flex; gap: 16px; width: 100%; align-items: stretch; }
+.viewport-wrap {
+  position: relative; flex: 1; min-width: 0; background: #000;
+  border-radius: 8px; overflow: hidden; aspect-ratio: 16/9;
+}
+.viewport-wrap video {
+  width: 100%; height: 100%; display: block; pointer-events: none;
+  position: absolute; top: 0; left: 0; object-fit: contain; background: #000;
+}
+#mouse-capture { position: absolute; inset: 0; cursor: grab; user-select: none; z-index: 5; }
+#mouse-capture:active { cursor: grabbing; }
+#conn-status {
+  position: absolute; top: 8px; right: 10px; font-size: 0.65rem;
+  padding: 3px 10px; border-radius: 99px; background: #222; color: #888; z-index: 10;
+}
+#conn-status.live { background: #0d260d; color: #4caf50; }
+#conn-status.err  { background: #3a1a1a; color: #f55; }
+
+.ref-fullwidth {
+  width: 100%; max-width: 880px; max-height: 55vh; aspect-ratio: 16/9;
+  background: #000; border-radius: 8px; display: block;
+  object-fit: contain; margin: 0 auto;
+}
+.ref-panel {
+  background: #111; border-radius: 8px; padding: 10px; display: flex;
+  flex-direction: column; gap: 8px;
+}
+.ref-panel h3 {
+  font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: #666; margin: 0; padding: 0 2px;
+}
+.ref-thumbs { display: flex; flex-direction: column; gap: 6px; }
+.ref-thumb-wrap { position: relative; cursor: zoom-in; }
+.ref-thumb-wrap img.thumb {
+  width: 100%; aspect-ratio: 3/2; object-fit: cover; border-radius: 5px;
+  background: #000; display: block; border: 1px solid #1c1c1c;
+  transition: border-color 0.15s ease;
+}
+.ref-thumb-wrap:hover img.thumb { border-color: #4a9eff; }
+.ref-thumb-wrap .magnified {
+  position: absolute; right: calc(100% + 14px); top: 50%; transform: translateY(-50%);
+  width: 720px; max-width: 60vw; aspect-ratio: 3/2; object-fit: cover;
+  border-radius: 8px; border: 2px solid #4a9eff; background: #000;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+  visibility: hidden; opacity: 0; pointer-events: none;
+  transition: opacity 0.12s ease;
+  z-index: 100;
+}
+.ref-thumb-wrap:hover .magnified { visibility: visible; opacity: 1; }
+.ref-caption { font-size: 0.68rem; color: #555; padding: 0 2px; }
+
+.controls-panel {
+  background: #111; border-radius: 8px; padding: 12px 14px; display: flex;
+  flex-direction: column; gap: 8px; font-size: 0.74rem; color: #aaa;
+}
+.controls-panel h3 { font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em;
+                     text-transform: uppercase; color: #666; margin: 0 0 4px; }
+.ctrl-row { display: flex; align-items: flex-start; gap: 8px; line-height: 1.4; }
+.ctrl-icon { font-size: 1rem; line-height: 1.4; color: #4a9eff; flex-shrink: 0; width: 22px; }
+.ctrl-label { color: #ccc; font-weight: 500; font-size: 0.78rem; }
+.ctrl-desc  { color: #666; font-size: 0.68rem; }
+
+.btn {
+  padding: 10px 36px; background: #4a9eff; color: white; border: none;
+  border-radius: 6px; font-size: 0.9rem; cursor: pointer; transition: background 0.2s;
+}
+.btn:hover { background: #3a8eef; }
+.btn[disabled] { opacity: 0.4; pointer-events: none; }
+
+.q-block { background: #111; border-radius: 8px; padding: 16px 20px; width: 100%; max-width: 880px; }
+
+.slider-block { display: flex; flex-direction: column; gap: 6px; }
+.slider-row { display: flex; align-items: center; gap: 14px; }
+.slider-row input[type=range] {
+  flex: 1; -webkit-appearance: none; appearance: none;
+  height: 6px; background: linear-gradient(to right, #2a2a2a, #2a2a2a);
+  border-radius: 99px; outline: none; cursor: pointer;
+}
+.slider-row input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #4a9eff; border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5); cursor: grab;
+}
+.slider-row input[type=range]::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #4a9eff; border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5); cursor: grab;
+}
+.slider-row input[type=range].untouched::-webkit-slider-thumb { background: #555; }
+.slider-row input[type=range].untouched::-moz-range-thumb { background: #555; }
+.slider-value { width: 56px; font-family: ui-monospace, Menlo, monospace;
+                font-size: 0.95rem; color: #ddd; text-align: right; }
+.slider-value.untouched { color: #555; }
+.slider-endpoints {
+  display: flex; justify-content: space-between;
+  font-size: 0.7rem; color: #555; margin-top: 2px; padding: 0 4px;
+}
+
+.binary-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.check-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px; border: 1px solid #2a2a2a; border-radius: 6px;
+  background: #0a0a0a; color: #aaa; cursor: pointer;
+  font-size: 0.85rem;
+}
+.check-pill:hover { border-color: #555; color: #ddd; }
+.check-pill input { width: 16px; height: 16px; accent-color: #4a9eff; cursor: pointer; }
+.check-pill:has(input:checked) {
+  border-color: #4a9eff; color: #ddd; background: #0d2240;
+}
+
+.save-msg { font-size: 0.85rem; color: #4caf50; }
+.save-msg.err { color: #f55; }
+.hint { font-size: 0.78rem; color: #666; max-width: 560px; text-align: center; }
+
+.timer-pill {
+  font-size: 0.72rem; color: #666; padding: 3px 10px; border-radius: 99px;
+  background: #1a1a1a; font-family: ui-monospace, Menlo, monospace;
+}
+.timer-pill.unlocked { color: #4caf50; }
+
+.spinner {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 3px solid #1e1e1e; border-top-color: #4a9eff;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- ── Welcome 1/2 ── -->
+<div class="screen welcome-page" id="screen-welcome-1">
+  <span class="pager">Step 1 of 2</span>
+  <h1>3D Render Convergence — Quality &amp; Smoothness</h1>
+  <p style="text-align: center;">
+    You'll see <strong style="color:#eee">8 short interactive demos</strong>
+    across two 3D scenes. Each demo is a different version of the renderer —
+    some will look sharp, others blurry, fuzzy, or full of floating blobs.
+    <strong style="color:#eee">Drag with your mouse to orbit</strong> and
+    scroll to zoom.
+  </p>
+  <p style="text-align: center;">
+    Before each scene's demos you'll see a short reference clip of the real
+    scene. For each demo, move <strong style="color:#eee">three sliders</strong>
+    — foreground quality (the main subject), background quality (walls,
+    ground, distant geometry), and rendering smoothness (how responsive
+    it feels when you drag).
+  </p>
+  <p style="text-align: center; color:#aaa; font-size:0.95rem;">
+    <strong style="color:#eee">A note on zoom:</strong> these scenes were only
+    captured from a limited range of viewpoints, so if you zoom <em>way</em>
+    out the renderer will run out of training data and the background may turn
+    black, blocky, or incomplete. That's a quirk of the capture, not the
+    method — please disregard those regions when rating.
+  </p>
+  <p style="text-align: center; color:#888; font-size:0.95rem;">
+    Takes about 8–10 minutes.
+  </p>
+  <p style="text-align: center; font-size:0.95rem; color:#f5a623;">
+    <strong>Heads-up:</strong> please don't refresh or close this tab during
+    the session — refreshing starts you over from scratch.
+  </p>
+  <button class="btn" onclick="goWelcome(2)">Next →</button>
+</div>
+
+<!-- ── Welcome 2/2 ── -->
+<div class="screen welcome-page" id="screen-welcome-2" hidden>
+  <span class="pager">Step 2 of 2</span>
+  <h1>Last thing — your initials.</h1>
+  <p style="text-align: center;">
+    Type your initials so we can label your responses. They're only used in
+    the saved file's name; nothing else identifying is recorded.
+  </p>
+
+  <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+    <input id="initials-input" type="text" maxlength="8" autocomplete="off"
+           placeholder="e.g. ab"
+           style="font-size:1.2rem; padding:12px 18px; width:220px;
+                  text-align:center; background:#1a1a1a; color:#eee;
+                  border:1px solid #333; border-radius:6px;
+                  letter-spacing:0.15em; text-transform:uppercase;" />
+    <div id="initials-error" style="font-size:0.8rem; color:#f55; min-height:1.2em;"></div>
+  </div>
+
+  <button class="btn" id="start-btn" onclick="startSession()">Start →</button>
+</div>
+
+<!-- ── Loading screen ── -->
+<div class="screen" id="screen-loading" hidden style="padding-top:120px; gap:20px;">
+  <div class="spinner"></div>
+  <h2 id="loading-title">Loading…</h2>
+  <p class="hint" id="loading-sub">Connecting to renderer</p>
+</div>
+
+<!-- ── Reference (shown once at session start) ── -->
+<div class="screen" id="screen-reference" hidden>
+  <div class="header-row">
+    <span class="badge">Ground truth</span>
+    <span class="meta">Real photos of this scene, played back as video</span>
+  </div>
+  <video id="ref-video" class="ref-fullwidth"
+         controls loop muted playsinline preload="auto"></video>
+  <div class="meta" style="text-align:center;">
+    Source: training photos played as a 20 fps flythrough at 1920×1080 (one
+    photo per frame, ~13–15 s loop). Press play if it doesn't autoplay; let
+    it loop a couple of times to get a feel for the scene. The next 4
+    renders were all trained on these photos.
+  </div>
+  <button class="btn" onclick="finishReference()">Continue to renders →</button>
+</div>
+
+<!-- ── Rating screen ── -->
+<div class="screen" id="screen-rating" hidden>
+  <div class="header-row">
+    <span class="badge" id="stim-badge">Demo 1 of 4</span>
+    <span class="timer-pill" id="timer-pill">explore ≥ 10s</span>
+  </div>
+
+  <div class="view-row">
+    <div class="viewport-wrap" id="viewport-wrap">
+      <video id="vid" autoplay playsinline muted></video>
+      <div id="mouse-capture"></div>
+      <span id="conn-status">connecting…</span>
+    </div>
+  </div>
+
+  <div class="meta" style="text-align:center; margin-top:-4px;">
+    🖱️ click and drag to orbit · scroll to zoom
+  </div>
+
+  <div class="q-block slider-block">
+    <h3>Foreground quality</h3>
+    <div class="meta" style="margin-bottom:8px; font-size:0.78rem;">
+      The main subject (e.g. truck, train).
+    </div>
+    <div class="slider-row">
+      <input type="range" min="0" max="100" value="50" id="fg-slider" class="untouched" />
+      <span class="slider-value untouched" id="fg-value">—</span>
+    </div>
+    <div class="slider-endpoints">
+      <span>Unusable — blurry, fuzz, floaters</span>
+      <span>Photo-realistic, sharp</span>
+    </div>
+  </div>
+
+  <div class="q-block slider-block">
+    <h3>Background quality</h3>
+    <div class="meta" style="margin-bottom:8px; font-size:0.78rem;">
+      Walls, ground, distant geometry — everything that isn't the main subject.
+      <em style="color:#888">Black/blocky regions when you've zoomed far out
+      are a capture-coverage artefact, not the method — please disregard.</em>
+    </div>
+    <div class="slider-row">
+      <input type="range" min="0" max="100" value="50" id="bg-slider" class="untouched" />
+      <span class="slider-value untouched" id="bg-value">—</span>
+    </div>
+    <div class="slider-endpoints">
+      <span>Unusable — blurry, fuzz, floaters</span>
+      <span>Photo-realistic, sharp</span>
+    </div>
+  </div>
+
+  <div class="q-block">
+    <h3>Rendering smoothness — was it smooth enough?</h3>
+    <div class="meta" style="margin-bottom:8px; font-size:0.78rem;">
+      Did the renderer keep up with your dragging without obvious stutter or lag?
+    </div>
+    <div class="binary-row" id="smooth-binary">
+      <label class="check-pill"><input type="radio" name="smooth-q" value="yes"> Yes — smooth enough</label>
+      <label class="check-pill"><input type="radio" name="smooth-q" value="no"> No — stuttered/laggy</label>
+    </div>
+  </div>
+
+  <button class="btn" id="next-btn" onclick="submitStim()" disabled>Next →</button>
+  <div class="hint" id="next-hint">Drag the scene around for a few seconds, then move both sliders.</div>
+</div>
+
+<!-- ── Final feedback ── -->
+<div class="screen welcome-page" id="screen-feedback" hidden>
+  <span class="pager">One last thing</span>
+  <h1>Any feedback for us?</h1>
+  <p style="text-align: center;">
+    Anything that confused you, surprised you, or that we could improve?
+    Suggestions for the study design, the slider wording, or the renderer
+    behaviour — all welcome. Skip the box if you've got nothing to add.
+  </p>
+  <div class="q-block" style="max-width: 760px;">
+    <textarea id="feedback-text" placeholder="e.g. 'the yes/no smoothness call was hard to make — most demos felt borderline'" style="min-height: 140px; width: 100%; resize: vertical; background:#0a0a0a; color:#ddd; border:1px solid #2a2a2a; border-radius:5px; padding:10px 12px; font:inherit; font-size:0.85rem; line-height:1.4; outline:none;"></textarea>
+  </div>
+  <button class="btn" onclick="submitFeedback()">Submit &amp; finish →</button>
+</div>
+
+<!-- ── Done ── -->
+<div class="screen welcome-page" id="screen-done" hidden>
+  <h1 style="color:#4a9eff;">All done — thank you!</h1>
+  <p id="save-status" class="save-msg" style="margin-top:4px; font-size:0.95rem;"></p>
+  <p style="text-align: center; color:#888;">
+    Curious what you were rating? Take a look at the debrief.
+  </p>
+  <div style="display:flex; gap:14px;">
+    <button class="btn" onclick="showDebrief()">Show debrief →</button>
+  </div>
+</div>
+
+<!-- ── Debrief ── -->
+<div class="screen welcome-page" id="screen-debrief" hidden>
+  <span class="pager">Debrief</span>
+  <h1>What you were rating</h1>
+
+  <div class="q-block" style="max-width: 760px;">
+    <h3>The renderer</h3>
+    <p>
+      All 8 demos came from the same method —
+      <strong style="color:#eee">3D Gaussian Splatting</strong> (3DGS) — a
+      scene representation built from millions of small fuzzy 3D blobs that
+      get blended together to form an image.
+    </p>
+    <p>
+      Two variables: the <strong style="color:#eee">scene</strong> (truck and
+      train, both from Tanks &amp; Temples) and
+      <strong style="color:#eee">how long the model was trained</strong>
+      (1k / 3k / 7k / 30k iterations). More iterations means more blobs in
+      finer positions — sharper pictures, but also slower frame rates as the
+      GPU has more blobs to draw.
+    </p>
+  </div>
+
+  <div class="q-block" style="max-width: 760px;">
+    <h3>Your ratings vs. quantitative metrics</h3>
+    <p style="font-size:0.85rem; color:#888; margin-bottom:10px;">
+      Three standard image-quality metrics computed against held-out
+      photos of the same scene (higher PSNR/SSIM = better, lower LPIPS =
+      better; LPIPS is a learned perceptual metric).
+    </p>
+    <div id="debrief-table"></div>
+  </div>
+
+  <p style="text-align: center; color:#666; max-width: 600px;">
+    Thanks again — your responses are saved. You can close this tab.
+  </p>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════════════════════════════
+const CFG = {
+  server: '',                 // filled with location.hostname at startup
+  whepPort: 8889,
+  wsPort: 8765,
+  whepPath: '3dgs',
+  // Multi-scene convergence. Renderer holds (scene, label) pairs as
+  // 'scene:label' keys; client sends those strings in `swap` messages.
+  scenes: ['truck', 'train'],
+  iters:  [
+    { label: '1k',  iter:  1000 },
+    { label: '3k',  iter:  3000 },
+    { label: '7k',  iter:  7000 },
+    { label: '30k', iter: 30000 },
+  ],
+  minExplore: 10,             // seconds before "Next" unlocks
+};
+CFG.server = location.hostname || '127.0.0.1';
+
+// ══════════════════════════════════════════════════════════════════
+//  Stimulus list — randomize scene order per participant; iters
+//  ascend within each scene (convergence demo).
+// ══════════════════════════════════════════════════════════════════
+const sceneOrder = [...CFG.scenes];
+for (let i = sceneOrder.length - 1; i > 0; i--) {
+  const j = Math.floor(Math.random() * (i + 1));
+  [sceneOrder[i], sceneOrder[j]] = [sceneOrder[j], sceneOrder[i]];
+}
+const stimuli = [];
+sceneOrder.forEach(scene => {
+  CFG.iters.forEach(it => stimuli.push({ scene, ...it }));
+});
+
+// ══════════════════════════════════════════════════════════════════
+//  Screens
+// ══════════════════════════════════════════════════════════════════
+const $w1     = document.getElementById('screen-welcome-1');
+const $w2     = document.getElementById('screen-welcome-2');
+const $load   = document.getElementById('screen-loading');
+const $ref    = document.getElementById('screen-reference');
+const $rate   = document.getElementById('screen-rating');
+const $fb     = document.getElementById('screen-feedback');
+const $done   = document.getElementById('screen-done');
+const $deb    = document.getElementById('screen-debrief');
+
+function show(el) {
+  [$w1, $w2, $load, $ref, $rate, $fb, $done, $deb].forEach(s => s.hidden = (s !== el));
+}
+function goWelcome(n) { show(n === 1 ? $w1 : $w2); }
+
+// ══════════════════════════════════════════════════════════════════
+//  Participant identity
+// ══════════════════════════════════════════════════════════════════
+const participant = { initials: null, is_test: false, id: null, started: null };
+
+function startSession() {
+  const raw = (document.getElementById('initials-input').value || '').trim();
+  const sanitized = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const errEl = document.getElementById('initials-error');
+  if (!sanitized || sanitized.length < 1 || sanitized.length > 8) {
+    errEl.textContent = 'Please enter 1–8 letters or digits.';
+    document.getElementById('initials-input').focus();
+    return;
+  }
+  errEl.textContent = '';
+
+  participant.initials = raw;
+  participant.is_test  = (sanitized === 'test');
+
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const ymd = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}`;
+  const hms = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  participant.id      = `${sanitized}-conv-int-${ymd}-${hms}`;
+  participant.started = now.toISOString();
+
+  // Connect WS + WHEP in the background while the participant watches the
+  // first scene's ground-truth video.
+  connectWS();
+  connectWebRTC();
+  nextStim();
+}
+
+// Each scene gets its own ref video shown once, right before its block of
+// 4 stimuli. Tracks the last scene we showed a ref for so we don't re-show.
+let lastRefScene = null;
+
+function showReference(scene) {
+  const seqUrl = `/refs/${scene}_seq_1080_20.mp4`;
+  const refVid = document.getElementById('ref-video');
+  refVid.src = seqUrl;
+  try { refVid.currentTime = 0; } catch (e) {}
+  refVid.play().catch(() => { /* user can press play manually */ });
+  lastRefScene = scene;
+  show($ref);
+}
+
+function finishReference() {
+  // Pause + free the ref video so it doesn't consume CPU during the renders.
+  const refVid = document.getElementById('ref-video');
+  try { refVid.pause(); } catch (e) {}
+  refVid.removeAttribute('src');
+  refVid.load();
+  startStim();
+}
+
+// Decide whether to show a ref video before the next stimulus.
+function nextStim() {
+  if (stimIdx >= stimuli.length) { /* fallthrough: caller handles done */ return; }
+  const stim = stimuli[stimIdx];
+  if (stim.scene !== lastRefScene) {
+    showReference(stim.scene);
+  } else {
+    startStim();
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  WebSocket (mux on :8765, every msg tagged method:'3dgs')
+// ══════════════════════════════════════════════════════════════════
+let ws = null, wsReady = false, wsQueue = [];
+function connectWS() {
+  ws = new WebSocket(`ws://${CFG.server}:${CFG.wsPort}`);
+  ws.onopen  = () => { wsReady = true; wsQueue.forEach(m => ws.send(JSON.stringify(m))); wsQueue = []; };
+  ws.onclose = () => { wsReady = false; };
+  ws.onerror = e => console.warn('WS error', e);
+}
+function sendMsg(obj) {
+  const tagged = { method: '3dgs', ...obj };
+  if (wsReady) ws.send(JSON.stringify(tagged));
+  else wsQueue.push(tagged);
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  WebRTC (WHEP)
+// ══════════════════════════════════════════════════════════════════
+const vid        = document.getElementById('vid');
+const connStatus = document.getElementById('conn-status');
+let pc = null;
+
+async function connectWebRTC() {
+  if (pc) { try { pc.close(); } catch(e) {} }
+  pc = new RTCPeerConnection({ iceServers: [] });
+  pc.ontrack = e => { vid.srcObject = e.streams[0]; };
+  pc.onconnectionstatechange = updateConnStatus;
+  pc.addTransceiver('video', { direction: 'recvonly' });
+  try {
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    const r = await fetch(`http://${CFG.server}:${CFG.whepPort}/${CFG.whepPath}/whep`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/sdp' },
+      body: pc.localDescription.sdp,
+    });
+    if (!r.ok) { console.warn(`WHEP HTTP ${r.status}`); return; }
+    await pc.setRemoteDescription({ type: 'answer', sdp: await r.text() });
+  } catch (e) {
+    console.error('WHEP failed', e);
+  }
+}
+function updateConnStatus() {
+  if (!pc) { connStatus.textContent = 'connecting…'; connStatus.className = ''; return; }
+  if (pc.connectionState === 'connected') {
+    connStatus.textContent = '● live'; connStatus.className = 'live';
+  } else if (['failed','disconnected'].includes(pc.connectionState)) {
+    connStatus.textContent = '● ' + pc.connectionState; connStatus.className = 'err';
+  } else {
+    connStatus.textContent = pc.connectionState || 'connecting…'; connStatus.className = '';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  Mouse / wheel input — same protocol as cross_method.html
+// ══════════════════════════════════════════════════════════════════
+const captureEl = document.getElementById('mouse-capture');
+function normCoords(e) {
+  const r = captureEl.getBoundingClientRect();
+  return { nx: (e.clientX - r.left) / r.width, ny: (e.clientY - r.top) / r.height };
+}
+
+// Per-stim mouse trajectory log. Reset at start of each stim (in startStim).
+// `t` is ms since stimStartT — relative timestamps so each stim is a clean
+// little log. Recording is gated on trackingMouse so loading/swap noise is
+// excluded.
+let mouseEvents = [];
+let stimStartT = 0;
+let trackingMouse = false;
+function recordMouse(ev) {
+  if (!trackingMouse) return;
+  mouseEvents.push({ t: Math.round(performance.now() - stimStartT), ...ev });
+}
+
+captureEl.addEventListener('mousedown', e => {
+  const c = normCoords(e);
+  sendMsg({ type: 'mousedown', ...c, button: e.button + 1 });
+  recordMouse({ type: 'down', ...c, button: e.button + 1 });
+});
+captureEl.addEventListener('mouseup', e => {
+  const c = normCoords(e);
+  sendMsg({ type: 'mouseup', ...c, button: e.button + 1 });
+  recordMouse({ type: 'up', ...c, button: e.button + 1 });
+});
+captureEl.addEventListener('mousemove', e => {
+  const c = normCoords(e);
+  sendMsg({ type: 'mousemove', ...c });
+  recordMouse({ type: 'move', ...c });
+});
+captureEl.addEventListener('wheel', e => {
+  e.preventDefault();
+  const c = normCoords(e);
+  const delta = Math.sign(e.deltaY);
+  sendMsg({ type: 'scroll', ...c, delta });
+  recordMouse({ type: 'scroll', ...c, delta });
+}, { passive: false });
+window.addEventListener('mouseup', () => sendMsg({ type: 'mouseup' }));
+
+// ══════════════════════════════════════════════════════════════════
+//  Per-stimulus state
+// ══════════════════════════════════════════════════════════════════
+let stimIdx = 0;
+const phase2_results = [];
+
+const stimBadge    = document.getElementById('stim-badge');
+const timerPill    = document.getElementById('timer-pill');
+const fgSlider     = document.getElementById('fg-slider');
+const fgValue      = document.getElementById('fg-value');
+const bgSlider     = document.getElementById('bg-slider');
+const bgValue      = document.getElementById('bg-value');
+const nextBtn      = document.getElementById('next-btn');
+const nextHint     = document.getElementById('next-hint');
+
+let fgTouched = false, bgTouched = false;
+let smoothChoice = null;  // 'yes' | 'no' — binary smoothness call
+let dwellStart = 0;
+let unlockAt   = 0;
+let dwellTimer = null;
+
+function resetSliders() {
+  fgTouched = false; bgTouched = false;
+  smoothChoice = null;
+  fgSlider.value = 50; bgSlider.value = 50;
+  [fgSlider, bgSlider].forEach(el => el.classList.add('untouched'));
+  [fgValue, bgValue].forEach(el => {
+    el.classList.add('untouched'); el.textContent = '—';
+  });
+  document.querySelectorAll('#smooth-binary input[type=radio]').forEach(r => { r.checked = false; });
+}
+
+function tickTimer() {
+  const elapsed = (performance.now() - dwellStart) / 1000;
+  const remaining = Math.max(0, CFG.minExplore - elapsed);
+  if (remaining > 0) {
+    timerPill.textContent = `explore ≥ ${Math.ceil(remaining)}s`;
+    timerPill.classList.remove('unlocked');
+  } else {
+    timerPill.textContent = '✓ ready when you are';
+    timerPill.classList.add('unlocked');
+    clearInterval(dwellTimer);
+    checkNextReady();
+  }
+}
+
+function checkNextReady() {
+  const enoughDwell = performance.now() >= unlockAt;
+  const allTouched  = fgTouched && bgTouched && smoothChoice !== null;
+  const ready = enoughDwell && allTouched;
+  nextBtn.disabled = !ready;
+  if (!enoughDwell)      nextHint.textContent = 'Drag the scene around for a few seconds first.';
+  else if (!allTouched)  nextHint.textContent = 'Move both sliders and answer the smoothness question to continue.';
+  else                   nextHint.textContent = '';
+}
+
+function wireSlider(slider, valueEl, mark) {
+  slider.addEventListener('input', () => {
+    mark();
+    slider.classList.remove('untouched');
+    valueEl.classList.remove('untouched');
+    valueEl.textContent = slider.value;
+    checkNextReady();
+  });
+}
+wireSlider(fgSlider, fgValue, () => { fgTouched = true; });
+wireSlider(bgSlider, bgValue, () => { bgTouched = true; });
+
+document.querySelectorAll('#smooth-binary input[type=radio]').forEach(r => {
+  r.addEventListener('change', () => {
+    smoothChoice = r.value;
+    checkNextReady();
+  });
+});
+
+function startStim() {
+  const stim = stimuli[stimIdx];
+  stimBadge.textContent = `Demo ${stimIdx + 1} of ${stimuli.length}`;
+
+  // Tell renderer to swap to (scene, ckpt) + reset camera. Cross-scene swaps
+  // also rotate the orbit basis to the new scene's canonical view.
+  sendMsg({ type: 'swap', to: `${stim.scene}:${stim.label}`, reset_view: true });
+  updateConnStatus();
+
+  resetSliders();
+  // Begin recording mouse trajectory for this stim. Reset buffer + clock.
+  mouseEvents = [];
+  stimStartT = performance.now();
+  trackingMouse = true;
+  dwellStart = performance.now();
+  unlockAt   = dwellStart + CFG.minExplore * 1000;
+  if (dwellTimer) clearInterval(dwellTimer);
+  dwellTimer = setInterval(tickTimer, 200);
+  tickTimer();
+  checkNextReady();
+
+  show($rate);
+}
+
+async function submitStim() {
+  const stim = stimuli[stimIdx];
+  // Stop recording — rating done, anything afterwards is noise.
+  trackingMouse = false;
+  const dwellMs = Math.round(performance.now() - dwellStart);
+  phase2_results.push({
+    stim_index:  stimIdx,
+    scene:       stim.scene,
+    iter:        stim.iter,
+    ckpt_label:  stim.label,
+    foreground:  Number(fgSlider.value),
+    background:  Number(bgSlider.value),
+    smoothness:  smoothChoice,  // 'yes' | 'no'
+    dwell_ms:    dwellMs,
+    mouse_events: mouseEvents,
+    timestamp:   new Date().toISOString(),
+  });
+
+  const snapshot = {
+    participant_id: participant.id,
+    initials:       participant.initials,
+    is_test:        participant.is_test,
+    study:          'convergence_3dgs_interactive',
+    scene_order:    sceneOrder,
+    started_at:     participant.started,
+    user_agent:     navigator.userAgent,
+    last_updated:   new Date().toISOString(),
+    n_stimuli:      stimuli.length,
+    phase2_results,
+  };
+
+  let savedName = null;
+  try {
+    const r = await fetch('/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(snapshot),
+    });
+    if (r.ok) savedName = (await r.json()).saved;
+  } catch (e) {
+    console.warn('save failed', e);
+  }
+
+  stimIdx++;
+  if (stimIdx < stimuli.length) {
+    nextStim();
+  } else {
+    // All stims done — close media but DEFER debrief until the participant
+    // submits the final feedback page.
+    if (dwellTimer) clearInterval(dwellTimer);
+    try { pc?.close(); } catch(e) {}
+    window._lastSavedName = savedName;
+    show($fb);
+    // Save-status (shown later on $done) will be filled in submitFeedback()
+    // after the final post completes.
+    document.getElementById('save-status').textContent =
+      savedName
+        ? `${phase2_results.length} ratings saved as ${savedName}.`
+        : `Save failed — please contact the researcher.`;
+    console.log('final snapshot', snapshot);
+  }
+}
+
+async function submitFeedback() {
+  const feedback = (document.getElementById('feedback-text').value || '').trim();
+  const snapshot = {
+    participant_id: participant.id,
+    initials:       participant.initials,
+    is_test:        participant.is_test,
+    study:          'convergence_3dgs_interactive',
+    scene_order:    sceneOrder,
+    started_at:     participant.started,
+    user_agent:     navigator.userAgent,
+    last_updated:   new Date().toISOString(),
+    n_stimuli:      stimuli.length,
+    phase2_results,
+    general_feedback: feedback,
+  };
+  let savedName = window._lastSavedName || null;
+  try {
+    const r = await fetch('/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(snapshot),
+    });
+    if (r.ok) savedName = (await r.json()).saved;
+  } catch (e) {
+    console.warn('save failed', e);
+  }
+  show($done);
+  document.getElementById('save-status').textContent =
+    savedName
+      ? `${phase2_results.length} ratings saved as ${savedName}.`
+      : `Save failed — please contact the researcher.`;
+}
+
+// Held-out test-set metrics from gsplat val_step*.json (frozen at training
+// time — see interactive-3d-human-eval/runs_3dgs/<scene>/stats/).
+const METRICS = {
+  truck: {
+     1000: { psnr: 20.94, ssim: 0.726, lpips: 0.326 },
+     3000: { psnr: 22.65, ssim: 0.800, lpips: 0.207 },
+     7000: { psnr: 23.87, ssim: 0.845, lpips: 0.143 },
+    30000: { psnr: 25.04, ssim: 0.871, lpips: 0.095 },
+  },
+  train: {
+     1000: { psnr: 17.06, ssim: 0.584, lpips: 0.550 },
+     3000: { psnr: 18.75, ssim: 0.650, lpips: 0.413 },
+     7000: { psnr: 19.73, ssim: 0.721, lpips: 0.298 },
+    30000: { psnr: 21.44, ssim: 0.812, lpips: 0.146 },
+  },
+};
+
+function showDebrief() {
+  // Sort by (scene, iter) so the convergence story reads cleanly.
+  const sorted = [...phase2_results].sort((a, b) => {
+    if (a.scene !== b.scene) return a.scene < b.scene ? -1 : 1;
+    return a.iter - b.iter;
+  });
+  const rows = sorted.map(r => {
+    const m = (METRICS[r.scene] || {})[r.iter] || {};
+    const psnr  = m.psnr  != null ? m.psnr.toFixed(2)  : '—';
+    const ssim  = m.ssim  != null ? m.ssim.toFixed(3)  : '—';
+    const lpips = m.lpips != null ? m.lpips.toFixed(3) : '—';
+    return `<tr>
+      <td>${r.scene}</td>
+      <td>${(r.iter/1000)}k</td>
+      <td>${r.foreground}</td>
+      <td>${r.background}</td>
+      <td>${r.smoothness === 'yes' ? 'Yes' : r.smoothness === 'no' ? 'No' : '—'}</td>
+      <td>${psnr}</td>
+      <td>${ssim}</td>
+      <td>${lpips}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('debrief-table').innerHTML = `
+    <table class="debrief-tbl">
+      <thead><tr>
+        <th>Scene</th><th>Iters</th>
+        <th>Your<br>foreground</th><th>Your<br>background</th><th>Your<br>smoothness</th>
+        <th>PSNR</th><th>SSIM</th><th>LPIPS</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  show($deb);
+}
+</script>
+</body>
+</html>

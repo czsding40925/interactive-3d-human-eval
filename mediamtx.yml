@@ -1,0 +1,39 @@
+# mediamtx.yml — configuration for the WebRTC/RTSP relay server
+# Docs: https://github.com/bluenviron/mediamtx
+
+# Ports
+rtspAddress: :8554       # ffmpeg pushes RTSP here (internal only — do NOT open in SG)
+webrtcAddress: :8889     # browsers connect via WebRTC HTTP signalling here
+apiAddress: :9997        # REST API (optional, useful for health checks)
+
+# Logging
+logLevel: info
+
+# WebRTC settings — configured for AWS public-internet access:
+#   - TCP-only ICE candidates so a single TCP port (8189) traverses the SG cleanly,
+#     no UDP NAT punching required.
+#   - webrtcAdditionalHosts advertises the L4's public IP in ICE candidates so the
+#     browser knows where to connect. Update this when the L4 is restarted (the
+#     public IP rotates without an Elastic IP).
+webrtcICEServers2: []
+webrtcLocalUDPAddress: ''
+webrtcLocalTCPAddress: :8189
+webrtcAdditionalHosts: ['3.128.31.164']
+
+paths:
+  # Legacy single-stream path (still used by the M-vs-L i-NGP A/B viewer).
+  stream:
+    source: publisher
+
+  # Method-aware paths used by the i-NGP-vs-Nexels viewer:
+  #   /ingp   ← interactive_renderer.py pushes here
+  #   /nexel  ← nexels_renderer.py    pushes here
+  ingp:
+    source: publisher
+  nexel:
+    source: publisher
+
+  # Convergence study (3DGS, single-method, multi-ckpt swap):
+  #   /3dgs   ← gsplat_renderer.py pushes here
+  3dgs:
+    source: publisher

@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Render Evaluator — Side-by-side (i-NGP vs Nexels, coupled cameras)</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: #0d0d0d; color: #ddd; font-family: system-ui, sans-serif;
+  display: flex; flex-direction: column; align-items: center;
+  min-height: 100vh; padding: 24px; gap: 18px;
+}
+h1 { font-size: 1.05rem; font-weight: 500; color: #aaa; letter-spacing: 0.05em; }
+h2 { font-size: 0.95rem; font-weight: 600; color: #ccc; }
+h3 { font-size: 0.8rem; font-weight: 600; color: #aaa; margin-bottom: 12px; }
+p, .meta { font-size: 0.82rem; color: #777; line-height: 1.6; }
+
+.welcome-page { padding-top: 60px; gap: 28px; }
+.welcome-page h1 { font-size: 2.1rem; font-weight: 600; color: #eee;
+                   letter-spacing: 0; line-height: 1.25; max-width: 780px;
+                   text-align: center; }
+.welcome-page h3 { font-size: 1.1rem; color: #ddd; margin-bottom: 14px;
+                   letter-spacing: 0; text-transform: none; }
+.welcome-page p { font-size: 1.05rem; color: #bbb; line-height: 1.7;
+                  max-width: 720px !important; }
+.welcome-page .q-block { max-width: 760px; }
+.welcome-page .btn { padding: 14px 44px; font-size: 1rem; }
+.welcome-page .pager { font-size: 0.85rem; color: #555;
+                       letter-spacing: 0.18em; text-transform: uppercase; }
+
+table.debrief-tbl { width: 100%; border-collapse: collapse; font-size: 0.92rem; color: #ccc; }
+table.debrief-tbl th, table.debrief-tbl td { padding: 8px 10px; text-align: left;
+  border-bottom: 1px solid #1c1c1c; }
+table.debrief-tbl th { color: #888; font-weight: 600; font-size: 0.78rem;
+  letter-spacing: 0.08em; text-transform: uppercase; }
+table.debrief-tbl td.ingp  { color: #4a9eff; }
+table.debrief-tbl td.nexel { color: #f5a623; }
+table.debrief-tbl td.tie   { color: #888; }
+
+.screen { width: 100%; max-width: 1500px; display: flex; flex-direction: column;
+          align-items: center; gap: 14px; }
+.screen[hidden] { display: none; }
+/* Push the dual viewport screen down so it sits more centered vertically. */
+#screen-viewing { padding-top: 60px; gap: 18px; }
+
+.badge {
+  font-size: 0.7rem; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; padding: 3px 12px; border-radius: 99px;
+  background: #1c1c1c; color: #888;
+}
+.badge.a { background: #0d2240; color: #4a9eff; }
+.badge.b { background: #241a08; color: #f5a623; }
+
+.header-row { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+
+/* Side-by-side dual viewport. Each viewport has its own mouse-capture
+   overlay so the two cameras are independently controlled. */
+.dual-row {
+  position: relative; width: 100%; display: grid;
+  grid-template-columns: 1fr 1fr; gap: 12px;
+}
+.viewport-wrap {
+  position: relative; background: #000; border-radius: 8px; overflow: hidden;
+  aspect-ratio: 16/9;
+}
+.viewport-wrap video {
+  width: 100%; height: 100%; display: block; pointer-events: none;
+  position: absolute; top: 0; left: 0; object-fit: contain; background: #000;
+}
+.vp-badge {
+  position: absolute; top: 8px; left: 10px; z-index: 10;
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; padding: 4px 12px; border-radius: 99px;
+  background: rgba(20, 20, 20, 0.85); color: #ddd;
+  backdrop-filter: blur(6px);
+}
+.vp-badge.a { background: rgba(13, 34, 64, 0.85); color: #6cb4ff; }
+.vp-badge.b { background: rgba(36, 26, 8, 0.85); color: #ffba47; }
+.vp-conn {
+  position: absolute; top: 8px; right: 10px; z-index: 10;
+  font-size: 0.65rem; padding: 3px 10px; border-radius: 99px;
+  background: rgba(40, 40, 40, 0.85); color: #888;
+}
+.vp-conn.live { background: rgba(13, 38, 13, 0.85); color: #4caf50; }
+.vp-conn.err  { background: rgba(58, 26, 26, 0.85); color: #ff5555; }
+
+.mouse-capture {
+  position: absolute; inset: 0; cursor: grab; user-select: none; z-index: 5;
+}
+.mouse-capture:active { cursor: grabbing; }
+
+.controls-hint {
+  font-size: 0.78rem; color: #666; text-align: center;
+}
+
+.btn {
+  padding: 10px 36px; background: #4a9eff; color: white; border: none;
+  border-radius: 6px; font-size: 0.9rem; cursor: pointer; transition: background 0.2s;
+}
+.btn:hover { background: #3a8eef; }
+.btn[disabled] { opacity: 0.4; pointer-events: none; }
+
+.scale-row { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; width: 100%; }
+
+/* Per-method rating pair: two columns mirroring the viewport order. */
+#questions-panel { display: flex; flex-direction: column; align-items: center;
+                   gap: 18px; width: 100%; padding-top: 14px; }
+#questions-panel[hidden] { display: none; }
+.scroll-back-banner {
+  background: linear-gradient(90deg, #1a2a44 0%, #1a2a44 100%);
+  border: 1px solid #2a4a72;
+  color: #9ec5ff;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-weight: 500;
+  text-align: center;
+  width: 100%;
+  max-width: 880px;
+  letter-spacing: 0.01em;
+}
+.scroll-back-banner strong { color: #d6e6ff; font-weight: 600; }
+.rating-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; width: 100%; }
+.rating-cell { display: flex; flex-direction: column; gap: 6px; }
+.rating-cell .rating-label {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: #888;
+}
+.rating-cell.a .rating-label { color: #6cb4ff; }
+.rating-cell.b .rating-label { color: #ffba47; }
+.slider-row { display: flex; align-items: center; gap: 12px; }
+.slider-row input[type=range] {
+  flex: 1; -webkit-appearance: none; appearance: none;
+  height: 6px; background: #2a2a2a; border-radius: 99px; outline: none; cursor: pointer;
+}
+.slider-row input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #4a9eff; border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5); cursor: grab;
+}
+.slider-row input[type=range]::-moz-range-thumb {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #4a9eff; border: 2px solid #fff;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.5); cursor: grab;
+}
+.rating-cell.b .slider-row input[type=range]::-webkit-slider-thumb { background: #f5a623; }
+.rating-cell.b .slider-row input[type=range]::-moz-range-thumb     { background: #f5a623; }
+.slider-row input[type=range].untouched::-webkit-slider-thumb { background: #555; }
+.slider-row input[type=range].untouched::-moz-range-thumb     { background: #555; }
+.slider-value { width: 44px; font-family: ui-monospace, Menlo, monospace;
+                font-size: 0.95rem; color: #ddd; text-align: right; }
+.slider-value.untouched { color: #555; }
+.slider-endpoints {
+  display: flex; justify-content: space-between;
+  font-size: 0.68rem; color: #555; margin-top: 2px;
+}
+
+.checkbox-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.check-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 16px; border: 1px solid #2a2a2a; border-radius: 99px;
+  background: transparent; color: #aaa; font-size: 0.85rem; cursor: pointer;
+  transition: all 0.15s; user-select: none;
+}
+.check-pill:hover { border-color: #555; color: #ddd; }
+.check-pill input { width: 16px; height: 16px; accent-color: #4a9eff; cursor: pointer; }
+.check-pill:has(input:checked) {
+  border-color: #4a9eff; color: #4a9eff; background: #0d2240;
+}
+.scale-btn {
+  padding: 10px 4px; border: 1px solid #2a2a2a; border-radius: 5px;
+  background: transparent; color: #888; font-size: 0.7rem; cursor: pointer;
+  transition: all 0.15s; line-height: 1.25; text-align: center;
+}
+.scale-btn:hover { border-color: #555; color: #ddd; }
+.scale-btn.selected.left  { border-color: #4a9eff; color: #4a9eff; background: #0d2240; }
+.scale-btn.selected.right { border-color: #f5a623; color: #f5a623; background: #241a08; }
+.scale-btn.selected.mid   { border-color: #888;    color: #ddd;    background: #1a1a1a; }
+.scale-btn.selected.neutral { border-color: #888;  color: #ddd;    background: #1a1a1a; }
+.scale-endpoints {
+  display: flex; justify-content: space-between;
+  font-size: 0.7rem; color: #555; margin-top: 4px;
+}
+
+.q-block { background: #111; border-radius: 8px; padding: 16px 20px; width: 100%; max-width: 880px; }
+
+textarea {
+  width: 100%; min-height: 70px; resize: vertical;
+  background: #0a0a0a; color: #ddd; border: 1px solid #2a2a2a; border-radius: 5px;
+  padding: 10px 12px; font: inherit; font-size: 0.85rem; line-height: 1.4;
+  outline: none;
+}
+textarea:focus { border-color: #444; }
+
+.save-msg { font-size: 0.85rem; color: #4caf50; }
+.save-msg.err { color: #f55; }
+.hint { font-size: 0.78rem; color: #444; max-width: 560px; text-align: center; }
+
+.spinner {
+  width: 36px; height: 36px; border-radius: 50%;
+  border: 3px solid #1e1e1e; border-top-color: #4a9eff;
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<!-- ── Welcome 1/3 ── -->
+<div class="screen welcome-page" id="screen-welcome-1">
+  <span class="pager">Step 1 of 3</span>
+  <h1>Welcome!</h1>
+  <p style="text-align: center; font-size:1.15rem; color:#ddd;">
+    Thanks for taking part in this 3D render quality study.
+  </p>
+  <p style="text-align: center;">
+    In this study, you'll see several pairs of live 3D renders of the same
+    scene, shown <strong style="color:#eee">side by side</strong> as
+    <strong style="color:#eee">Method A</strong> (left) and
+    <strong style="color:#eee">Method B</strong> (right). The two methods
+    use different ways of representing 3D scenes — your job is to compare
+    how each one looks and feels.
+  </p>
+  <p style="text-align: center;">
+    Each viewport is controlled independently — drag inside the left one to
+    orbit Method A, drag inside the right one to orbit Method B. Take as
+    long as you'd like on each pair, then rate the two methods and
+    (optionally) leave a free-text comment. We'll explain what the methods
+    actually are at the end.
+  </p>
+  <p style="text-align: center; font-size:0.95rem; color:#f5a623;">
+    <strong>Heads-up:</strong> please don't refresh or close this tab during
+    the session — refreshing starts you over from scratch.
+  </p>
+  <button class="btn" onclick="goWelcome(2)">Next →</button>
+</div>
+
+<!-- ── Welcome 2/3 ── -->
+<div class="screen welcome-page" id="screen-welcome-2" hidden>
+  <span class="pager">Step 2 of 3</span>
+  <h1>What we mean by …</h1>
+
+  <div class="q-block">
+    <h3>Quality (foreground vs background)</h3>
+    <p>
+      How the picture looks <em>when nothing's moving</em>: sharpness, detail,
+      colour, blurriness, ghosting, "noisy" pixels. We'll ask about
+      <strong style="color:#eee">foreground</strong> (the main subject — bicycle,
+      chair, plant, etc.) and <strong style="color:#eee">background</strong>
+      (walls, floor, distant geometry) separately, since methods often trade
+      off between them.
+    </p>
+    <p style="margin-top:10px; color:#aaa;">
+      <strong style="color:#eee">A note on zoom:</strong> these scenes were only
+      captured from a limited range of viewpoints, so if you zoom <em>way</em>
+      out the renderer will run out of training data and the background may turn
+      black, blocky, or incomplete. That's a quirk of the capture, not the
+      method — please ignore it and rate the background as you see it at normal
+      framings.
+    </p>
+  </div>
+
+  <div class="q-block">
+    <h3>Smoothness</h3>
+    <p>
+      How <em>responsive</em> each renderer feels when you drag or zoom in
+      its viewport. The two viewports react to your mouse independently, so
+      try each side. We just ask whether each one was smooth enough — yes or
+      no — not a fine-grained rating. This is about the renderers themselves,
+      not your network.
+    </p>
+  </div>
+
+  <button class="btn" onclick="goWelcome(3)">Next →</button>
+</div>
+
+<!-- ── Welcome 3/3 ── -->
+<div class="screen welcome-page" id="screen-welcome-3" hidden>
+  <span class="pager">Step 3 of 3</span>
+  <h1>Last thing — your initials.</h1>
+  <p style="text-align: center;">
+    Type your initials so we can label your responses. They're only used in
+    the saved file's name; nothing else identifying is recorded.
+  </p>
+
+  <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+    <input id="initials-input" type="text" maxlength="8" autocomplete="off"
+           placeholder="e.g. ab"
+           style="font-size:1.2rem; padding:12px 18px; width:220px;
+                  text-align:center; background:#1a1a1a; color:#eee;
+                  border:1px solid #333; border-radius:6px;
+                  letter-spacing:0.15em; text-transform:uppercase;" />
+    <div id="initials-error" style="font-size:0.8rem; color:#f55; min-height:1.2em;"></div>
+  </div>
+
+  <p style="text-align: center; color:#888; font-size:0.95rem;">
+    Before the real session you'll do <strong style="color:#eee">one practice
+    pair</strong> to get used to the controls. The practice pair isn't recorded.
+  </p>
+
+  <button class="btn" id="start-btn" onclick="startSession()">Try a practice run →</button>
+</div>
+
+<!-- ── Loading ── -->
+<div class="screen" id="screen-loading" hidden style="padding-top:120px; gap:20px;">
+  <div class="spinner"></div>
+  <h2 id="loading-title">Loading…</h2>
+  <p class="hint" id="loading-sub">Preparing renders</p>
+</div>
+
+<!-- ── Viewing (side-by-side, both methods always visible) ── -->
+<div class="screen" id="screen-viewing" hidden>
+  <div class="header-row">
+    <span class="meta" id="pair-label">Pair 1 of 6</span>
+    <span class="meta">Cameras linked — drag anywhere to orbit both</span>
+  </div>
+
+  <div class="dual-row" id="dual-row">
+    <div class="viewport-wrap" id="vp-A">
+      <video id="vid-A" autoplay playsinline muted></video>
+      <span class="vp-badge a" id="badge-A">Method A</span>
+      <span class="vp-conn"  id="conn-A">connecting…</span>
+      <div class="mouse-capture" id="mouse-capture-A" data-slot="A"></div>
+    </div>
+    <div class="viewport-wrap" id="vp-B">
+      <video id="vid-B" autoplay playsinline muted></video>
+      <span class="vp-badge b" id="badge-B">Method B</span>
+      <span class="vp-conn"  id="conn-B">connecting…</span>
+      <div class="mouse-capture" id="mouse-capture-B" data-slot="B"></div>
+    </div>
+  </div>
+
+  <div class="controls-hint">
+    🖱️ click + drag inside each viewport to orbit · scroll to zoom · the two cameras move independently
+  </div>
+
+  <button class="btn" id="advance-btn" onclick="revealQuestions()">Done exploring — show questions →</button>
+
+  <!-- Inline questions panel: appears BELOW the dual-row when "Done" is
+       clicked, so the renderers stay live + draggable while answering. -->
+  <div id="questions-panel" hidden>
+    <div class="scroll-back-banner">
+      ↑ <strong>The renderers above stay live.</strong> Scroll up any time to drag the viewports and revisit a view while answering.
+    </div>
+    <h2 id="prefer-pair-label">Pair 1 of 6 — questions</h2>
+
+    <div class="q-block">
+      <h3>Foreground quality — rate each render</h3>
+      <div class="meta" style="margin-bottom:10px; font-size:0.78rem;">
+        How does the main subject (bicycle, plant, chair, etc.) look in each
+        viewport? 0 = unusable, 100 = photo-realistic.
+      </div>
+      <div class="rating-pair" data-metric="foreground"></div>
+    </div>
+
+    <div class="q-block">
+      <h3>Background quality — rate each render</h3>
+      <div class="meta" style="margin-bottom:10px; font-size:0.78rem;">
+        Walls, floor, distant geometry — everything that isn't the main subject.
+        <em style="color:#888">Black/blocky regions when you've zoomed far out
+        are a capture-coverage artefact, not the method — please disregard.</em>
+      </div>
+      <div class="rating-pair" data-metric="background"></div>
+    </div>
+
+    <div class="q-block">
+      <h3>Rendering smoothness — was each render smooth enough?</h3>
+      <div class="meta" style="margin-bottom:10px; font-size:0.78rem;">
+        Did the renderer keep up with your dragging without obvious stutter or lag?
+      </div>
+      <div class="rating-pair">
+        <div class="rating-cell a">
+          <div class="rating-label">Method A</div>
+          <div class="checkbox-row binary-row" data-slot="A">
+            <label class="check-pill"><input type="radio" name="smooth-A" value="yes"> Yes — smooth enough</label>
+            <label class="check-pill"><input type="radio" name="smooth-A" value="no"> No — stuttered/laggy</label>
+          </div>
+        </div>
+        <div class="rating-cell b">
+          <div class="rating-label">Method B</div>
+          <div class="checkbox-row binary-row" data-slot="B">
+            <label class="check-pill"><input type="radio" name="smooth-B" value="yes"> Yes — smooth enough</label>
+            <label class="check-pill"><input type="radio" name="smooth-B" value="no"> No — stuttered/laggy</label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="q-block">
+      <h3>Overall, which one do you prefer?</h3>
+      <div class="scale-row" id="overall-row"></div>
+      <div class="scale-endpoints">
+        <span style="color:#4a9eff">Strongly prefer A</span>
+        <span style="color:#f5a623">Strongly prefer B</span>
+      </div>
+    </div>
+
+    <div class="q-block" id="aspects-block">
+      <h3>Which aspects shaped your overall preference?</h3>
+      <div class="meta" style="margin-bottom:10px; font-size:0.78rem;">
+        Pick one or more.
+      </div>
+      <div class="checkbox-row" id="aspects-row">
+        <label class="check-pill"><input type="checkbox" value="foreground"> Foreground quality</label>
+        <label class="check-pill"><input type="checkbox" value="background"> Background quality</label>
+        <label class="check-pill"><input type="checkbox" value="smoothness"> Rendering smoothness</label>
+      </div>
+    </div>
+
+    <div class="q-block">
+      <h3>Additional feedback <span style="font-weight:400;color:#666">(optional)</span></h3>
+      <textarea id="comment-text" placeholder="e.g. 'A had crisper bicycle frame edges; B looked smoother but lost fine texture'"></textarea>
+    </div>
+
+    <button class="btn" id="submit-btn" onclick="submitPair()" disabled>Submit →</button>
+  </div>
+</div>
+
+<!-- ── Practice complete interstitial ── -->
+<div class="screen" id="screen-practice-done" hidden style="padding-top:80px; gap:18px;">
+  <h1 style="color:#4caf50">Practice complete.</h1>
+  <p style="max-width: 560px; text-align:center;">
+    That's how each pair will go. Your responses from the practice pair were
+    not recorded. The real session has 6 pairs — take your time on each.
+  </p>
+  <button class="btn" onclick="beginRealSession()">Begin real session →</button>
+</div>
+
+<!-- ── Final feedback ── -->
+<div class="screen welcome-page" id="screen-feedback" hidden>
+  <span class="pager">One last thing</span>
+  <h1>Any feedback for us?</h1>
+  <p style="text-align: center;">
+    Anything that confused you, surprised you, or that we could improve?
+    Suggestions for the study design, the renderer behaviour, the question
+    wording — all welcome. Skip the box if you've got nothing to add.
+  </p>
+  <div class="q-block" style="max-width: 760px;">
+    <textarea id="feedback-text" placeholder="e.g. 'the yes/no smoothness call was hard to make — both sides felt borderline'" style="min-height: 140px;"></textarea>
+  </div>
+  <button class="btn" onclick="submitFeedback()">Submit &amp; finish →</button>
+</div>
+
+<!-- ── Done ── -->
+<div class="screen welcome-page" id="screen-done" hidden>
+  <h1 style="color:#4a9eff;">All done — thank you!</h1>
+  <p id="save-status" class="save-msg" style="margin-top:4px; font-size:0.95rem;"></p>
+  <p style="text-align: center; color:#888;">
+    Curious which method was which? Take a look at the debrief — totally
+    optional, you can close the tab now if you'd rather.
+  </p>
+  <div style="display:flex; gap:14px;">
+    <button class="btn" onclick="showDebrief()">Show debrief →</button>
+  </div>
+</div>
+
+<!-- ── Debrief ── -->
+<div class="screen welcome-page" id="screen-debrief" hidden>
+  <span class="pager">Debrief</span>
+  <h1>What you were comparing</h1>
+
+  <div class="q-block" style="max-width: 760px;">
+    <h3>The two methods</h3>
+    <p>
+      <strong style="color:#4a9eff">i-NGP</strong> (Instant Neural Graphics
+      Primitives) stores the scene as a small neural network with a
+      multi-resolution hash grid of features. Rendering means stepping a
+      ray through the volume and asking the network for color &amp; density
+      at each step.
+    </p>
+    <p>
+      <strong style="color:#f5a623">Nexels</strong> (Neurally-Textured
+      Surfels) represents the scene as many small textured 2D disks, with
+      a shared hash grid for appearance. Rendering rasterizes the disks and
+      blends them by depth.
+    </p>
+    <p>
+      Both were trained on the same images of each scene at the
+      <strong>same storage budget</strong> — fair fight for "given X
+      megabytes, which representation produces the better picture at
+      interactive frame rates?"
+    </p>
+  </div>
+
+  <div class="q-block" style="max-width: 760px;">
+    <h3>Your responses, pair by pair</h3>
+    <div id="debrief-table"></div>
+  </div>
+
+  <div class="q-block" style="max-width: 760px;">
+    <h3>Your overall lean</h3>
+    <p id="debrief-lean">—</p>
+  </div>
+
+  <p style="text-align: center; color:#666; max-width: 600px;">
+    Thanks again — your responses are saved. You can close this tab.
+  </p>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+//  CONFIG — mirrors cross_method.html. Two changes for side-by-side:
+//    (a) both methods are always streaming + visible (no phase A→B switch)
+//    (b) every mouse/scroll event is broadcast to BOTH methods (coupled)
+// ══════════════════════════════════════════════════════════════════
+const CFG = {
+  server: '',
+  whepPort: 8889,
+  wsPort: 8765,
+  methods: {
+    ingp:  { whepPath: 'ingp',  label: 'i-NGP'  },
+    nexel: { whepPath: 'nexel', label: 'Nexels' },
+  },
+  // Set at startSession() based on initials. test → reveal method names on badges.
+  DEBUG_REVEAL: false,
+  // Size tier: ?size=small|medium (default 'small'). Renderers were already
+  // launched on the right tier; this only affects the label suffix in the
+  // result JSON.
+  size: (() => {
+    const s = new URLSearchParams(location.search).get('size') || 'small';
+    return (s === 'medium') ? 'medium' : 'small';
+  })(),
+  pairs: [
+    { scene: 'bicycle' },
+    { scene: 'counter' },
+    { scene: 'garden'  },
+    { scene: 'kitchen' },
+    { scene: 'room'    },
+    { scene: 'stump'   },
+  ],
+  practicePair: { scene: 'bonsai (practice)', sceneKey: 'bonsai' },
+};
+CFG.server = location.hostname || '127.0.0.1';
+
+const PREFER_LABELS = [
+  'Strongly\nprefer A', 'Prefer A', 'Slightly\nprefer A',
+  'No preference',
+  'Slightly\nprefer B', 'Prefer B', 'Strongly\nprefer B',
+];
+
+// ══════════════════════════════════════════════════════════════════
+//  Build scale buttons
+// ══════════════════════════════════════════════════════════════════
+function buildScale(rowId, labels, neutral=false) {
+  const row = document.getElementById(rowId);
+  row.dataset.neutral = neutral ? '1' : '';
+  row.innerHTML = '';
+  for (let i = 0; i < 7; i++) {
+    const btn = document.createElement('button');
+    btn.className = 'scale-btn';
+    btn.textContent = labels[i].replace('\n', ' ');
+    btn.title = labels[i].replace('\n', ' ');
+    btn.dataset.value = i - 3;
+    btn.onclick = () => onScaleClick(rowId, btn);
+    row.appendChild(btn);
+  }
+}
+function onScaleClick(rowId, btn) {
+  const row = document.getElementById(rowId);
+  row.querySelectorAll('.scale-btn').forEach(b =>
+    b.classList.remove('selected','left','right','mid','neutral'));
+  btn.classList.add('selected');
+  const v = parseInt(btn.dataset.value, 10);
+  if (row.dataset.neutral === '1') btn.classList.add('neutral');
+  else if (v < 0) btn.classList.add('left');
+  else if (v > 0) btn.classList.add('right');
+  else            btn.classList.add('mid');
+  state[rowId] = v;
+  if (rowId === 'overall-row') applyAspectsVisibility();
+  checkSubmitReady();
+}
+
+// Hide the "which aspects shaped your preference" block when the participant
+// picked No preference (overall = 0) — there's nothing to attribute. Clear
+// any aspects they ticked so a stale value isn't submitted.
+function applyAspectsVisibility() {
+  const block = document.getElementById('aspects-block');
+  const noPref = (state['overall-row'] === 0);
+  if (noPref) {
+    block.hidden = true;
+    state.aspects.clear();
+    document.querySelectorAll('#aspects-row input[type=checkbox]').forEach(cb => cb.checked = false);
+  } else {
+    block.hidden = false;
+  }
+}
+// Per-method rating state. Keys: '<metric>-<slot>' e.g. 'foreground-A'.
+// Foreground/background are 0-100 sliders (null = untouched). Smoothness is
+// a binary 'yes'|'no' (null = untouched) — captured separately in 'smooth-A'/'smooth-B'.
+const RATING_METRICS = ['foreground', 'background'];
+const state = {
+  // ratings populated below
+  'overall-row': null,
+  aspects: new Set(),
+  'smooth-A': null,
+  'smooth-B': null,
+};
+RATING_METRICS.forEach(m => { state[`${m}-A`] = null; state[`${m}-B`] = null; });
+
+buildScale('overall-row', PREFER_LABELS);
+
+// Build a {0-100 slider × 2 methods} block for each rating metric.
+function buildRatingPair(container, metric) {
+  // Endpoint copy depends on metric.
+  const ENDPOINTS = {
+    foreground: ['Unusable — blurry, fuzz', 'Photo-realistic, sharp'],
+    background: ['Unusable — blurry, fuzz', 'Photo-realistic, sharp'],
+  }[metric] || ['Worst', 'Best'];
+
+  ['A', 'B'].forEach(slot => {
+    const cell = document.createElement('div');
+    cell.className = `rating-cell ${slot.toLowerCase()}`;
+    cell.innerHTML = `
+      <div class="rating-label">Method ${slot}</div>
+      <div class="slider-row">
+        <input type="range" min="0" max="100" value="50" class="untouched"
+               data-metric="${metric}" data-slot="${slot}" />
+        <span class="slider-value untouched">—</span>
+      </div>
+      <div class="slider-endpoints">
+        <span>${ENDPOINTS[0]}</span><span>${ENDPOINTS[1]}</span>
+      </div>`;
+    container.appendChild(cell);
+
+    const input  = cell.querySelector('input');
+    const valEl  = cell.querySelector('.slider-value');
+    input.addEventListener('input', () => {
+      input.classList.remove('untouched');
+      valEl.classList.remove('untouched');
+      valEl.textContent = input.value;
+      state[`${metric}-${slot}`] = Number(input.value);
+      checkSubmitReady();
+    });
+  });
+}
+document.querySelectorAll('.rating-pair[data-metric]').forEach(c => {
+  buildRatingPair(c, c.dataset.metric);
+});
+
+// Multi-select checkbox group for "which aspects shaped your preference".
+document.querySelectorAll('#aspects-row input[type=checkbox]').forEach(cb => {
+  cb.addEventListener('change', () => {
+    if (cb.checked) state.aspects.add(cb.value);
+    else            state.aspects.delete(cb.value);
+    checkSubmitReady();
+  });
+});
+
+// Binary yes/no radios for per-method smoothness.
+document.querySelectorAll('.binary-row input[type=radio]').forEach(r => {
+  r.addEventListener('change', () => {
+    const slot = r.closest('.binary-row').dataset.slot;
+    state[`smooth-${slot}`] = r.value;
+    checkSubmitReady();
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
+//  Per-method WebRTC connections + single muxed WS
+// ══════════════════════════════════════════════════════════════════
+const conns = {
+  ingp:  { pc: null, video: document.getElementById('vid-A')  },  // assigned at pair-start
+  nexel: { pc: null, video: document.getElementById('vid-B') },
+};
+const slotForMethod = { ingp: null, nexel: null };  // 'A' or 'B' depending on per-pair flip
+
+let ws = null, wsReady = false, wsQueue = [];
+
+function connectWS() {
+  ws = new WebSocket(`ws://${CFG.server}:${CFG.wsPort}`);
+  ws.onopen = () => {
+    wsReady = true;
+    if (wsQueue.length) {
+      wsQueue.forEach(m => ws.send(JSON.stringify(m)));
+      wsQueue = [];
+    }
+  };
+  ws.onclose = () => { wsReady = false; };
+  ws.onerror = e => console.warn('WS error', e);
+}
+
+function sendMsg(method, obj) {
+  const tagged = { method, ...obj };
+  if (wsReady) ws.send(JSON.stringify(tagged));
+  else wsQueue.push(tagged);
+}
+
+// Independent cameras: each viewport's overlay sends only to its slot's method.
+const methodForSlot = { A: null, B: null };  // populated each pair start
+function sendToSlot(slot, obj) {
+  const method = methodForSlot[slot];
+  if (method) sendMsg(method, obj);
+}
+
+async function connectMethodWebRTC(method) {
+  const cfg = CFG.methods[method];
+  const c = conns[method];
+  if (c.pc) { try { c.pc.close(); } catch(e){} }
+  c.pc = new RTCPeerConnection({ iceServers: [] });
+  c.pc.ontrack = e => { c.video.srcObject = e.streams[0]; };
+  c.pc.onconnectionstatechange = () => updateConnStatus(method);
+  c.pc.addTransceiver('video', { direction: 'recvonly' });
+  try {
+    const offer = await c.pc.createOffer();
+    await c.pc.setLocalDescription(offer);
+    const r = await fetch(`http://${CFG.server}:${CFG.whepPort}/${cfg.whepPath}/whep`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/sdp' },
+      body: c.pc.localDescription.sdp,
+    });
+    if (!r.ok) {
+      console.warn(`WHEP ${cfg.whepPath} HTTP ${r.status}`);
+      return;
+    }
+    await c.pc.setRemoteDescription({ type: 'answer', sdp: await r.text() });
+  } catch (e) {
+    console.error(`WHEP ${cfg.whepPath} failed`, e);
+  }
+}
+
+function updateConnStatus(method) {
+  const slot = slotForMethod[method];
+  if (!slot) return;
+  const el = document.getElementById('conn-' + slot);
+  const pc = conns[method].pc;
+  if (!pc) { el.textContent = 'connecting…'; el.className = 'vp-conn'; return; }
+  if (pc.connectionState === 'connected') {
+    el.textContent = '● live'; el.className = 'vp-conn live';
+  } else if (['failed','disconnected'].includes(pc.connectionState)) {
+    el.textContent = '● ' + pc.connectionState; el.className = 'vp-conn err';
+  } else {
+    el.textContent = pc.connectionState || 'connecting…'; el.className = 'vp-conn';
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  Mouse / wheel input — one overlay per viewport. Coords normalize to
+//  THAT viewport's bounding box; events route to that slot's method only.
+//  Window mouseup releases drag on whichever side was active.
+// ══════════════════════════════════════════════════════════════════
+function normCoordsEl(e, el) {
+  const r = el.getBoundingClientRect();
+  return { nx: (e.clientX - r.left) / r.width, ny: (e.clientY - r.top) / r.height };
+}
+
+// Per-pair mouse trajectory log. Reset at start of each pair (in startPair).
+// Timestamps are ms since pairStartT — relative, easy to plot. Only recorded
+// while the dual viewport is live, so loading-screen jitter is excluded.
+let mouseEvents = [];
+let pairStartT = 0;
+let trackingMouse = false;
+function recordMouse(ev) {
+  if (!trackingMouse) return;
+  mouseEvents.push({ t: Math.round(performance.now() - pairStartT), ...ev });
+}
+
+['A', 'B'].forEach(slot => {
+  const el = document.getElementById('mouse-capture-' + slot);
+  el.addEventListener('mousedown', e => {
+    const c = normCoordsEl(e, el);
+    sendToSlot(slot, { type: 'mousedown', ...c, button: e.button + 1 });
+    recordMouse({ type: 'down', slot, ...c, button: e.button + 1 });
+  });
+  el.addEventListener('mouseup', e => {
+    const c = normCoordsEl(e, el);
+    sendToSlot(slot, { type: 'mouseup', ...c, button: e.button + 1 });
+    recordMouse({ type: 'up', slot, ...c, button: e.button + 1 });
+  });
+  el.addEventListener('mousemove', e => {
+    const c = normCoordsEl(e, el);
+    sendToSlot(slot, { type: 'mousemove', ...c });
+    recordMouse({ type: 'move', slot, ...c });
+  });
+  el.addEventListener('wheel', e => {
+    e.preventDefault();
+    const c = normCoordsEl(e, el);
+    const delta = Math.sign(e.deltaY);
+    sendToSlot(slot, { type: 'scroll', ...c, delta });
+    recordMouse({ type: 'scroll', slot, ...c, delta });
+  }, { passive: false });
+});
+// Releasing the mouse anywhere in the window should end any in-progress
+// drag in BOTH viewports — otherwise a drag started in A and released
+// outside it leaves A's renderer in 'mouse held' state.
+window.addEventListener('mouseup', () => {
+  ['A', 'B'].forEach(slot => sendToSlot(slot, { type: 'mouseup' }));
+});
+
+// ══════════════════════════════════════════════════════════════════
+//  Session construction. Same blinding scheme as the sequential page:
+//  per-pair coin flip decides whether i-NGP is "A" or "B".
+// ══════════════════════════════════════════════════════════════════
+function buildPair(p, isPractice=false) {
+  const sceneKey = p.sceneKey || p.scene;
+  const candidates = [
+    { method: 'ingp',  scene: sceneKey, label: `${sceneKey}_ingp_${CFG.size}`  },
+    { method: 'nexel', scene: sceneKey, label: `${sceneKey}_nexel_${CFG.size}` },
+  ];
+  const flipped = Math.random() < 0.5;
+  return {
+    scene: p.scene, practice: isPractice, flipped,
+    A: flipped ? candidates[1] : candidates[0],
+    B: flipped ? candidates[0] : candidates[1],
+  };
+}
+const realPairs = CFG.pairs
+  .map(p => ({ ...p }))
+  .sort(() => Math.random() - 0.5)
+  .map(p => buildPair(p, false));
+const practicePair = buildPair(CFG.practicePair, true);
+const session = [practicePair, ...realPairs];
+
+// ══════════════════════════════════════════════════════════════════
+//  Screen routing
+// ══════════════════════════════════════════════════════════════════
+const $welcome1     = document.getElementById('screen-welcome-1');
+const $welcome2     = document.getElementById('screen-welcome-2');
+const $welcome3     = document.getElementById('screen-welcome-3');
+const $viewing      = document.getElementById('screen-viewing');
+const $loading      = document.getElementById('screen-loading');
+const $practiceDone = document.getElementById('screen-practice-done');
+const $done         = document.getElementById('screen-done');
+const $debrief      = document.getElementById('screen-debrief');
+const $advanceBtn   = document.getElementById('advance-btn');
+const $questions    = document.getElementById('questions-panel');
+const pairLabel     = document.getElementById('pair-label');
+const preferPairLabel = document.getElementById('prefer-pair-label');
+const loadingTitle  = document.getElementById('loading-title');
+const loadingSub    = document.getElementById('loading-sub');
+
+const $feedback     = document.getElementById('screen-feedback');
+
+function show(el) {
+  [$welcome1, $welcome2, $welcome3, $viewing, $loading,
+   $practiceDone, $feedback, $done, $debrief].forEach(s => s.hidden = (s !== el));
+}
+
+function goWelcome(n) {
+  if (n === 1) show($welcome1);
+  else if (n === 2) show($welcome2);
+  else if (n === 3) show($welcome3);
+}
+
+let pairIdx = 0;
+const results = [];
+
+const participant = { initials: null, is_test: false, id: null, started: null };
+
+const LOAD_MS = 2500;
+
+function startSession() {
+  const raw = (document.getElementById('initials-input').value || '').trim();
+  const sanitized = raw.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const errEl = document.getElementById('initials-error');
+  if (!sanitized || sanitized.length < 1 || sanitized.length > 8) {
+    errEl.textContent = 'Please enter 1–8 letters or digits.';
+    document.getElementById('initials-input').focus();
+    return;
+  }
+  errEl.textContent = '';
+
+  participant.initials = raw;
+  participant.is_test  = (sanitized === 'test');
+  CFG.DEBUG_REVEAL     = participant.is_test;
+
+  const now = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  const ymd = `${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}`;
+  const hms = `${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+  // Distinct prefix from the sequential page so files don't collide.
+  participant.id      = `${sanitized}-sxs-${ymd}-${hms}`;
+  participant.started = now.toISOString();
+
+  connectWS();
+  setTimeout(() => { ['ingp', 'nexel'].forEach(m => connectMethodWebRTC(m)); }, 300);
+  startPair();
+}
+
+function applyBadges(pair) {
+  // pair.A.method is the true method shown in slot A; same for B.
+  // Reveal the underlying method name only in test/debug mode.
+  const aLabel = CFG.DEBUG_REVEAL
+    ? `Method A · ${CFG.methods[pair.A.method].label}`
+    : 'Method A';
+  const bLabel = CFG.DEBUG_REVEAL
+    ? `Method B · ${CFG.methods[pair.B.method].label}`
+    : 'Method B';
+  document.getElementById('badge-A').textContent = aLabel;
+  document.getElementById('badge-B').textContent = bLabel;
+}
+
+function bindMethodVideos(pair) {
+  // Wire each method's <video> element to the slot it occupies for this pair.
+  // The renderer pump for each method publishes one WHEP path; we just route
+  // the (already-attached) MediaStream to whichever <video> tag should show it.
+  const aMethod = pair.A.method, bMethod = pair.B.method;
+  conns[aMethod].video = document.getElementById('vid-A');
+  conns[bMethod].video = document.getElementById('vid-B');
+  // If srcObject is already set on the wrong slot from a prior pair, reattach.
+  ['ingp','nexel'].forEach(m => {
+    const pc = conns[m].pc;
+    if (pc) {
+      const senders = pc.getReceivers().map(r => r.track).filter(Boolean);
+      if (senders.length) {
+        const ms = new MediaStream(senders);
+        conns[m].video.srcObject = ms;
+      }
+    }
+  });
+  slotForMethod[aMethod] = 'A';
+  slotForMethod[bMethod] = 'B';
+  methodForSlot.A = aMethod;
+  methodForSlot.B = bMethod;
+}
+
+function pairTitle(pair) {
+  return pair.practice
+    ? `Practice  ·  ${pair.scene}`
+    : `Pair ${pairIdx} of ${realPairs.length}  ·  ${pair.scene}`;
+}
+
+function startPair() {
+  const pair = session[pairIdx];
+  pairLabel.textContent = pairTitle(pair);
+  preferPairLabel.textContent = pair.practice
+    ? 'Practice — answer the questions to see how it works'
+    : `Pair ${pairIdx} of ${realPairs.length} — questions`;
+
+  applyBadges(pair);
+
+  // Reference photos (3 angles per scene). Inline into the questions screen
+  // would be ideal — for now we keep them out for visual minimalism. The
+  // dual-viewport view IS the comparison surface.
+  // (Reference photos previously lived in cross_method.html's side panel.)
+
+  loadingTitle.textContent = pair.practice ? 'Loading practice scene…' : 'Loading next scene…';
+  loadingSub.textContent   = `${pair.scene}  ·  both methods, side by side`;
+  show($loading);
+
+  // Pre-load BOTH renderers' scene + reset their cameras so the linked-camera
+  // assumption (both start at the same view) holds.
+  sendMsg(pair.A.method, { type: 'swap', to: pair.A.scene, reset_view: true });
+  sendMsg(pair.B.method, { type: 'swap', to: pair.B.scene, reset_view: true });
+
+  setTimeout(() => {
+    bindMethodVideos(pair);
+    updateConnStatus('ingp');
+    updateConnStatus('nexel');
+    // Begin recording mouse trajectory for this pair. Reset buffer and clock.
+    mouseEvents = [];
+    pairStartT = performance.now();
+    trackingMouse = true;
+    // Reset the questions panel + all slider/scale state for the fresh pair.
+    RATING_METRICS.forEach(m => {
+      state[`${m}-A`] = null; state[`${m}-B`] = null;
+    });
+    state['smooth-A'] = null;
+    state['smooth-B'] = null;
+    state['overall-row'] = null;
+    state.aspects.clear();
+    document.querySelectorAll('.rating-pair input[type=range]').forEach(r => {
+      r.value = 50; r.classList.add('untouched');
+    });
+    document.querySelectorAll('.rating-pair .slider-value').forEach(v => {
+      v.textContent = '—'; v.classList.add('untouched');
+    });
+    document.querySelectorAll('.binary-row input[type=radio]').forEach(r => { r.checked = false; });
+    document.querySelectorAll('.scale-btn').forEach(b =>
+      b.classList.remove('selected','left','right','mid','neutral'));
+    document.querySelectorAll('#aspects-row input[type=checkbox]').forEach(cb => cb.checked = false);
+    document.getElementById('aspects-block').hidden = false;
+    document.getElementById('comment-text').value = '';
+    document.getElementById('submit-btn').disabled = true;
+    $questions.hidden  = true;
+    $advanceBtn.hidden = false;
+    show($viewing);
+  }, LOAD_MS);
+}
+
+function revealQuestions() {
+  // Drop the "Done exploring" button, slide the question panel in below the
+  // viewports, scroll it into view. Renderers stay live above.
+  $advanceBtn.hidden = true;
+  $questions.hidden  = false;
+  $questions.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function checkSubmitReady() {
+  const ratingsTouched = RATING_METRICS.every(m =>
+    state[`${m}-A`] !== null && state[`${m}-B`] !== null);
+  const smoothTouched = state['smooth-A'] !== null && state['smooth-B'] !== null;
+  const noPref = (state['overall-row'] === 0);
+  const aspectsOk = noPref || state.aspects.size > 0;
+  const ready = ratingsTouched
+             && smoothTouched
+             && state['overall-row'] !== null
+             && aspectsOk;
+  document.getElementById('submit-btn').disabled = !ready;
+}
+
+function resolvePref(pair, v) {
+  if (v < 0) return pair.A.method;
+  if (v > 0) return pair.B.method;
+  return 'tie';
+}
+
+async function submitPair() {
+  const pair = session[pairIdx];
+  // Stop recording — the rating happened, anything afterwards is noise.
+  trackingMouse = false;
+  if (pair.practice) { show($practiceDone); return; }
+
+  const o  = state['overall-row'];
+  const aspects = Array.from(state.aspects).sort();
+  // Capture ratings keyed BOTH by slot (A/B) and by underlying method, so
+  // analysis can either look at "left vs right" or "ingp vs nexel" without
+  // rejoining against method_a/method_b.
+  const ratings_by_slot   = {};
+  const ratings_by_method = {};
+  RATING_METRICS.forEach(m => {
+    ratings_by_slot[m]   = { a: state[`${m}-A`], b: state[`${m}-B`] };
+    ratings_by_method[m] = { [pair.A.method]: state[`${m}-A`],
+                             [pair.B.method]: state[`${m}-B`] };
+  });
+  // Smoothness is binary 'yes'|'no', kept alongside the 0-100 ratings under
+  // the same `smoothness` key so downstream analysis can treat it uniformly.
+  ratings_by_slot.smoothness   = { a: state['smooth-A'], b: state['smooth-B'] };
+  ratings_by_method.smoothness = { [pair.A.method]: state['smooth-A'],
+                                   [pair.B.method]: state['smooth-B'] };
+  const result = {
+    pair: pairIdx, scene: pair.scene,
+    size: CFG.size,
+    order_flipped: pair.flipped,
+    method_a: pair.A.method, method_b: pair.B.method,
+    label_a:  pair.A.label,  label_b:  pair.B.label,
+    ratings_by_slot,   // {foreground:{a,b}, background:{a,b}, smoothness:{a,b}}
+    ratings_by_method, // same values, keyed by ingp/nexel
+    overall_preference: o, overall_method: resolvePref(pair, o),
+    aspects_influencing_overall: aspects,  // subset of ['foreground','background','smoothness']
+    comment: document.getElementById('comment-text').value.trim(),
+    mouse_events: mouseEvents,
+    timestamp: new Date().toISOString(),
+  };
+  results.push(result);
+
+  const snapshot = {
+    participant_id: participant.id,
+    initials:       participant.initials,
+    is_test:        participant.is_test,
+    study:          'cross_method_side_by_side',
+    size:           CFG.size,
+    started_at:     participant.started,
+    user_agent:     navigator.userAgent,
+    last_updated:   new Date().toISOString(),
+    results,
+  };
+
+  let savedName = null;
+  try {
+    const r = await fetch('/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(snapshot),
+    });
+    if (r.ok) savedName = (await r.json()).saved;
+  } catch (e) {
+    console.warn('save failed', e);
+  }
+
+  pairIdx++;
+  if (pairIdx < session.length) {
+    // Hide the questions panel before the next pair's loading screen so
+    // returning to $viewing later doesn't briefly show stale state.
+    $questions.hidden = true;
+    $advanceBtn.hidden = false;
+    startPair();
+  } else {
+    // All pairs done — close media but DEFER closing WS / showing $done
+    // until the participant submits the final feedback page.
+    ['ingp','nexel'].forEach(m => { try { conns[m].pc?.close(); } catch(e){} });
+    window._lastSavedName = savedName;
+    show($feedback);
+  }
+}
+
+async function submitFeedback() {
+  // Append the optional free-text feedback to the snapshot and persist
+  // one more time, then move on to the debrief screen.
+  const feedback = (document.getElementById('feedback-text').value || '').trim();
+  const snapshot = {
+    participant_id: participant.id,
+    initials:       participant.initials,
+    is_test:        participant.is_test,
+    study:          'cross_method_side_by_side',
+    size:           CFG.size,
+    started_at:     participant.started,
+    user_agent:     navigator.userAgent,
+    last_updated:   new Date().toISOString(),
+    results,
+    general_feedback: feedback,
+  };
+  let savedName = window._lastSavedName || null;
+  try {
+    const r = await fetch('/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(snapshot),
+    });
+    if (r.ok) savedName = (await r.json()).saved;
+  } catch (e) {
+    console.warn('save failed', e);
+  }
+  show($done);
+  document.getElementById('save-status').textContent =
+    savedName
+      ? `${results.length} responses saved as ${savedName}.`
+      : `Save failed — please contact the researcher.`;
+  console.log('final snapshot', snapshot);
+}
+
+function beginRealSession() {
+  pairIdx = 1;
+  startPair();
+}
+
+function showDebrief() {
+  const rows = results.map((r, i) => {
+    const aCls = r.method_a === 'ingp' ? 'ingp' : 'nexel';
+    const bCls = r.method_b === 'ingp' ? 'ingp' : 'nexel';
+    const overallCls = r.overall_method === 'tie' ? 'tie' : r.overall_method;
+    const overallTxt = r.overall_method === 'ingp'  ? 'i-NGP'
+                    : r.overall_method === 'nexel' ? 'Nexels'
+                    : 'tie';
+    return `<tr>
+      <td>${i + 1}</td>
+      <td>${r.scene}</td>
+      <td class="${aCls}">${aCls === 'ingp' ? 'i-NGP' : 'Nexels'}</td>
+      <td class="${bCls}">${bCls === 'ingp' ? 'i-NGP' : 'Nexels'}</td>
+      <td class="${overallCls}">${overallTxt}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('debrief-table').innerHTML = `
+    <table class="debrief-tbl">
+      <thead><tr>
+        <th>#</th><th>Scene</th><th>Method A</th><th>Method B</th><th>Your overall pref.</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+
+  const counts = { ingp: 0, nexel: 0, tie: 0 };
+  results.forEach(r => { counts[r.overall_method] = (counts[r.overall_method] || 0) + 1; });
+  const total = results.length || 1;
+  const leanText =
+    counts.ingp > counts.nexel
+      ? `You leaned <strong style="color:#4a9eff">i-NGP</strong> overall (${counts.ingp}/${total} pairs, ${counts.nexel} Nexels, ${counts.tie} ties).`
+      : counts.nexel > counts.ingp
+        ? `You leaned <strong style="color:#f5a623">Nexels</strong> overall (${counts.nexel}/${total} pairs, ${counts.ingp} i-NGP, ${counts.tie} ties).`
+        : `You were split evenly (${counts.ingp} i-NGP, ${counts.nexel} Nexels, ${counts.tie} ties).`;
+  document.getElementById('debrief-lean').innerHTML = leanText;
+
+  show($debrief);
+}
+</script>
+</body>
+</html>
