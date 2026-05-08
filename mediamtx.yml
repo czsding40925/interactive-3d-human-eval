@@ -18,7 +18,7 @@ logLevel: info
 webrtcICEServers2: []
 webrtcLocalUDPAddress: ''
 webrtcLocalTCPAddress: :8189
-webrtcAdditionalHosts: ['3.128.31.164']
+webrtcAdditionalHosts: ['3.142.119.142']
 
 paths:
   # Legacy single-stream path (still used by the M-vs-L i-NGP A/B viewer).
