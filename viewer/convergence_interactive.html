@@ -146,7 +146,6 @@ table.debrief-tbl th { color: #888; font-weight: 600; font-size: 0.78rem;
   font-size: 0.7rem; color: #555; margin-top: 2px; padding: 0 4px;
 }
 
-.binary-row { display: flex; gap: 10px; flex-wrap: wrap; }
 .check-pill {
   display: inline-flex; align-items: center; gap: 8px;
   padding: 8px 14px; border: 1px solid #2a2a2a; border-radius: 6px;
@@ -311,19 +310,24 @@ table.debrief-tbl th { color: #888; font-weight: 600; font-size: 0.78rem;
     </div>
   </div>
 
-  <div class="q-block">
-    <h3>Rendering smoothness — was it smooth enough?</h3>
+  <div class="q-block slider-block">
+    <h3>Rendering smoothness</h3>
     <div class="meta" style="margin-bottom:8px; font-size:0.78rem;">
-      Did the renderer keep up with your dragging without obvious stutter or lag?
+      Did the renderer keep up with your dragging? 0 = stuttered/laggy,
+      100 = perfectly smooth.
     </div>
-    <div class="binary-row" id="smooth-binary">
-      <label class="check-pill"><input type="radio" name="smooth-q" value="yes"> Yes — smooth enough</label>
-      <label class="check-pill"><input type="radio" name="smooth-q" value="no"> No — stuttered/laggy</label>
+    <div class="slider-row">
+      <input type="range" min="0" max="100" value="50" id="sm-slider" class="untouched" />
+      <span class="slider-value untouched" id="sm-value">—</span>
+    </div>
+    <div class="slider-endpoints">
+      <span>Stuttered / laggy</span>
+      <span>Perfectly smooth</span>
     </div>
   </div>
 
   <button class="btn" id="next-btn" onclick="submitStim()" disabled>Next →</button>
-  <div class="hint" id="next-hint">Drag the scene around for a few seconds, then move both sliders.</div>
+  <div class="hint" id="next-hint">Drag the scene around for a few seconds, then move all three sliders.</div>
 </div>
 
 <!-- ── Final feedback ── -->
@@ -336,7 +340,7 @@ table.debrief-tbl th { color: #888; font-weight: 600; font-size: 0.78rem;
     behaviour — all welcome. Skip the box if you've got nothing to add.
   </p>
   <div class="q-block" style="max-width: 760px;">
-    <textarea id="feedback-text" placeholder="e.g. 'the yes/no smoothness call was hard to make — most demos felt borderline'" style="min-height: 140px; width: 100%; resize: vertical; background:#0a0a0a; color:#ddd; border:1px solid #2a2a2a; border-radius:5px; padding:10px 12px; font:inherit; font-size:0.85rem; line-height:1.4; outline:none;"></textarea>
+    <textarea id="feedback-text" placeholder="e.g. 'the smoothness slider was hard to anchor — most demos felt borderline'" style="min-height: 140px; width: 100%; resize: vertical; background:#0a0a0a; color:#ddd; border:1px solid #2a2a2a; border-radius:5px; padding:10px 12px; font:inherit; font-size:0.85rem; line-height:1.4; outline:none;"></textarea>
   </div>
   <button class="btn" onclick="submitFeedback()">Submit &amp; finish →</button>
 </div>
@@ -622,24 +626,23 @@ const fgSlider     = document.getElementById('fg-slider');
 const fgValue      = document.getElementById('fg-value');
 const bgSlider     = document.getElementById('bg-slider');
 const bgValue      = document.getElementById('bg-value');
+const smSlider     = document.getElementById('sm-slider');
+const smValue      = document.getElementById('sm-value');
 const nextBtn      = document.getElementById('next-btn');
 const nextHint     = document.getElementById('next-hint');
 
-let fgTouched = false, bgTouched = false;
-let smoothChoice = null;  // 'yes' | 'no' — binary smoothness call
+let fgTouched = false, bgTouched = false, smTouched = false;
 let dwellStart = 0;
 let unlockAt   = 0;
 let dwellTimer = null;
 
 function resetSliders() {
-  fgTouched = false; bgTouched = false;
-  smoothChoice = null;
-  fgSlider.value = 50; bgSlider.value = 50;
-  [fgSlider, bgSlider].forEach(el => el.classList.add('untouched'));
-  [fgValue, bgValue].forEach(el => {
+  fgTouched = false; bgTouched = false; smTouched = false;
+  fgSlider.value = 50; bgSlider.value = 50; smSlider.value = 50;
+  [fgSlider, bgSlider, smSlider].forEach(el => el.classList.add('untouched'));
+  [fgValue, bgValue, smValue].forEach(el => {
     el.classList.add('untouched'); el.textContent = '—';
   });
-  document.querySelectorAll('#smooth-binary input[type=radio]').forEach(r => { r.checked = false; });
 }
 
 function tickTimer() {
@@ -658,11 +661,11 @@ function tickTimer() {
 
 function checkNextReady() {
   const enoughDwell = performance.now() >= unlockAt;
-  const allTouched  = fgTouched && bgTouched && smoothChoice !== null;
+  const allTouched  = fgTouched && bgTouched && smTouched;
   const ready = enoughDwell && allTouched;
   nextBtn.disabled = !ready;
   if (!enoughDwell)      nextHint.textContent = 'Drag the scene around for a few seconds first.';
-  else if (!allTouched)  nextHint.textContent = 'Move both sliders and answer the smoothness question to continue.';
+  else if (!allTouched)  nextHint.textContent = 'Move all three sliders to continue.';
   else                   nextHint.textContent = '';
 }
 
@@ -677,13 +680,7 @@ function wireSlider(slider, valueEl, mark) {
 }
 wireSlider(fgSlider, fgValue, () => { fgTouched = true; });
 wireSlider(bgSlider, bgValue, () => { bgTouched = true; });
-
-document.querySelectorAll('#smooth-binary input[type=radio]').forEach(r => {
-  r.addEventListener('change', () => {
-    smoothChoice = r.value;
-    checkNextReady();
-  });
-});
+wireSlider(smSlider, smValue, () => { smTouched = true; });
 
 function startStim() {
   const stim = stimuli[stimIdx];
@@ -721,7 +718,7 @@ async function submitStim() {
     ckpt_label:  stim.label,
     foreground:  Number(fgSlider.value),
     background:  Number(bgSlider.value),
-    smoothness:  smoothChoice,  // 'yes' | 'no'
+    smoothness:  Number(smSlider.value),
     dwell_ms:    dwellMs,
     mouse_events: mouseEvents,
     timestamp:   new Date().toISOString(),
@@ -838,7 +835,7 @@ function showDebrief() {
       <td>${(r.iter/1000)}k</td>
       <td>${r.foreground}</td>
       <td>${r.background}</td>
-      <td>${r.smoothness === 'yes' ? 'Yes' : r.smoothness === 'no' ? 'No' : '—'}</td>
+      <td>${r.smoothness}</td>
       <td>${psnr}</td>
       <td>${ssim}</td>
       <td>${lpips}</td>

@@ -267,9 +267,9 @@ textarea:focus { border-color: #444; }
     <p>
       How <em>responsive</em> each renderer feels when you drag or zoom in
       its viewport. The two viewports react to your mouse independently, so
-      try each side. We just ask whether each one was smooth enough — yes or
-      no — not a fine-grained rating. This is about the renderers themselves,
-      not your network.
+      try each side. Rate each one on a 0–100 slider: 0 = stuttered / laggy,
+      100 = perfectly smooth. This is about the renderers themselves, not
+      your network.
     </p>
   </div>
 
@@ -366,26 +366,12 @@ textarea:focus { border-color: #444; }
     </div>
 
     <div class="q-block">
-      <h3>Rendering smoothness — was each render smooth enough?</h3>
+      <h3>Rendering smoothness — rate each render</h3>
       <div class="meta" style="margin-bottom:10px; font-size:0.78rem;">
-        Did the renderer keep up with your dragging without obvious stutter or lag?
+        Did the renderer keep up with your dragging? 0 = stuttered/laggy,
+        100 = perfectly smooth.
       </div>
-      <div class="rating-pair">
-        <div class="rating-cell a">
-          <div class="rating-label">Method A</div>
-          <div class="checkbox-row binary-row" data-slot="A">
-            <label class="check-pill"><input type="radio" name="smooth-A" value="yes"> Yes — smooth enough</label>
-            <label class="check-pill"><input type="radio" name="smooth-A" value="no"> No — stuttered/laggy</label>
-          </div>
-        </div>
-        <div class="rating-cell b">
-          <div class="rating-label">Method B</div>
-          <div class="checkbox-row binary-row" data-slot="B">
-            <label class="check-pill"><input type="radio" name="smooth-B" value="yes"> Yes — smooth enough</label>
-            <label class="check-pill"><input type="radio" name="smooth-B" value="no"> No — stuttered/laggy</label>
-          </div>
-        </div>
-      </div>
+      <div class="rating-pair" data-metric="smoothness"></div>
     </div>
 
     <div class="q-block">
@@ -438,7 +424,7 @@ textarea:focus { border-color: #444; }
     wording — all welcome. Skip the box if you've got nothing to add.
   </p>
   <div class="q-block" style="max-width: 760px;">
-    <textarea id="feedback-text" placeholder="e.g. 'the yes/no smoothness call was hard to make — both sides felt borderline'" style="min-height: 140px;"></textarea>
+    <textarea id="feedback-text" placeholder="e.g. 'the smoothness slider was hard to anchor — both sides felt borderline'" style="min-height: 140px;"></textarea>
   </div>
   <button class="btn" onclick="submitFeedback()">Submit &amp; finish →</button>
 </div>
@@ -587,15 +573,12 @@ function applyAspectsVisibility() {
   }
 }
 // Per-method rating state. Keys: '<metric>-<slot>' e.g. 'foreground-A'.
-// Foreground/background are 0-100 sliders (null = untouched). Smoothness is
-// a binary 'yes'|'no' (null = untouched) — captured separately in 'smooth-A'/'smooth-B'.
-const RATING_METRICS = ['foreground', 'background'];
+// All three metrics are 0-100 sliders (null = untouched).
+const RATING_METRICS = ['foreground', 'background', 'smoothness'];
 const state = {
   // ratings populated below
   'overall-row': null,
   aspects: new Set(),
-  'smooth-A': null,
-  'smooth-B': null,
 };
 RATING_METRICS.forEach(m => { state[`${m}-A`] = null; state[`${m}-B`] = null; });
 
@@ -607,6 +590,7 @@ function buildRatingPair(container, metric) {
   const ENDPOINTS = {
     foreground: ['Unusable — blurry, fuzz', 'Photo-realistic, sharp'],
     background: ['Unusable — blurry, fuzz', 'Photo-realistic, sharp'],
+    smoothness: ['Stuttered / laggy',       'Perfectly smooth'],
   }[metric] || ['Worst', 'Best'];
 
   ['A', 'B'].forEach(slot => {
@@ -644,15 +628,6 @@ document.querySelectorAll('#aspects-row input[type=checkbox]').forEach(cb => {
   cb.addEventListener('change', () => {
     if (cb.checked) state.aspects.add(cb.value);
     else            state.aspects.delete(cb.value);
-    checkSubmitReady();
-  });
-});
-
-// Binary yes/no radios for per-method smoothness.
-document.querySelectorAll('.binary-row input[type=radio]').forEach(r => {
-  r.addEventListener('change', () => {
-    const slot = r.closest('.binary-row').dataset.slot;
-    state[`smooth-${slot}`] = r.value;
     checkSubmitReady();
   });
 });
@@ -733,6 +708,30 @@ function updateConnStatus(method) {
   } else {
     el.textContent = pc.connectionState || 'connecting…'; el.className = 'vp-conn';
   }
+}
+
+// First-frame readiness per slot. Each video element fires loadeddata/playing
+// once when its WebRTC stream begins delivering frames; we latch that flag so
+// the per-pair loading screen can wait on BOTH sides before revealing
+// $viewing. Without this gate the two PCs negotiate independently and one
+// viewport can show up noticeably before the other on cold start — Ori
+// flagged this as visible asymmetry between methods.
+const firstFrameReady = { A: false, B: false };
+['A','B'].forEach(slot => {
+  const v = document.getElementById('vid-' + slot);
+  const mark = () => { firstFrameReady[slot] = true; };
+  v.addEventListener('loadeddata', mark);
+  v.addEventListener('playing',    mark);
+});
+function waitForBothFrames(timeoutMs) {
+  return new Promise(resolve => {
+    const start = performance.now();
+    (function poll() {
+      if (firstFrameReady.A && firstFrameReady.B) return resolve();
+      if (performance.now() - start > timeoutMs)  return resolve();
+      setTimeout(poll, 80);
+    })();
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -944,7 +943,14 @@ function startPair() {
   sendMsg(pair.A.method, { type: 'swap', to: pair.A.scene, reset_view: true });
   sendMsg(pair.B.method, { type: 'swap', to: pair.B.scene, reset_view: true });
 
-  setTimeout(() => {
+  // Reveal both viewports together: hold $loading until (a) both videos have
+  // delivered at least one frame and (b) a minimum dwell (LOAD_MS) has
+  // elapsed for renderer-side scene swaps to take effect. Bounded by 2×LOAD_MS
+  // so a stalled side can't hang the session.
+  Promise.all([
+    waitForBothFrames(LOAD_MS * 2),
+    new Promise(r => setTimeout(r, LOAD_MS)),
+  ]).then(() => {
     bindMethodVideos(pair);
     updateConnStatus('ingp');
     updateConnStatus('nexel');
@@ -956,8 +962,6 @@ function startPair() {
     RATING_METRICS.forEach(m => {
       state[`${m}-A`] = null; state[`${m}-B`] = null;
     });
-    state['smooth-A'] = null;
-    state['smooth-B'] = null;
     state['overall-row'] = null;
     state.aspects.clear();
     document.querySelectorAll('.rating-pair input[type=range]').forEach(r => {
@@ -966,7 +970,6 @@ function startPair() {
     document.querySelectorAll('.rating-pair .slider-value').forEach(v => {
       v.textContent = '—'; v.classList.add('untouched');
     });
-    document.querySelectorAll('.binary-row input[type=radio]').forEach(r => { r.checked = false; });
     document.querySelectorAll('.scale-btn').forEach(b =>
       b.classList.remove('selected','left','right','mid','neutral'));
     document.querySelectorAll('#aspects-row input[type=checkbox]').forEach(cb => cb.checked = false);
@@ -976,7 +979,7 @@ function startPair() {
     $questions.hidden  = true;
     $advanceBtn.hidden = false;
     show($viewing);
-  }, LOAD_MS);
+  });
 }
 
 function revealQuestions() {
@@ -990,11 +993,9 @@ function revealQuestions() {
 function checkSubmitReady() {
   const ratingsTouched = RATING_METRICS.every(m =>
     state[`${m}-A`] !== null && state[`${m}-B`] !== null);
-  const smoothTouched = state['smooth-A'] !== null && state['smooth-B'] !== null;
   const noPref = (state['overall-row'] === 0);
   const aspectsOk = noPref || state.aspects.size > 0;
   const ready = ratingsTouched
-             && smoothTouched
              && state['overall-row'] !== null
              && aspectsOk;
   document.getElementById('submit-btn').disabled = !ready;
@@ -1024,11 +1025,6 @@ async function submitPair() {
     ratings_by_method[m] = { [pair.A.method]: state[`${m}-A`],
                              [pair.B.method]: state[`${m}-B`] };
   });
-  // Smoothness is binary 'yes'|'no', kept alongside the 0-100 ratings under
-  // the same `smoothness` key so downstream analysis can treat it uniformly.
-  ratings_by_slot.smoothness   = { a: state['smooth-A'], b: state['smooth-B'] };
-  ratings_by_method.smoothness = { [pair.A.method]: state['smooth-A'],
-                                   [pair.B.method]: state['smooth-B'] };
   const result = {
     pair: pairIdx, scene: pair.scene,
     size: CFG.size,
