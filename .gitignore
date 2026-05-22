@@ -26,5 +26,11 @@ archive/
 # Local-only Claude reference — operational notes, kept out of the public repo
 CLAUDE.md
 
-# analysis 
+# analysis
 analysis/
+
+# Offline metrics tables — too noisy / WIP for the public repo
+method_metrics/
+
+# CS348K report drafts — kept local while iterating
+report/
