@@ -1,15 +1,20 @@
-# Streaming — human-eval pipeline for 3D rendering
+# Interactive Streaming Harness for Human Evaluation of Real-Time 3D Renderers
 
-A web-based, interactive human-eval pipeline for comparing 3D rendering
-methods under live novel-view synthesis. Two self-contained case studies
-ship with the repo, each with its own backend launcher and viewer page.
+> Static-image metrics like PSNR, SSIM, and LPIPS evaluate Novel View Synthesis
+> on fixed, held-out camera poses — but real users *drag the camera around*,
+> probe scenes interactively, and form opinions conditioned on the views they
+> chose to inspect. This repo is a streaming harness that lets researchers
+> collect that opinion at scale.
 
 ![Live rating demo](assets/viewer_demo.gif)
 
-The harness is renderer-agnostic: any process that consumes camera-pose
-deltas on a WebSocket and pushes H.264 over RTSP can plug in.
+📄 **[Full report (PDF)](report/main.pdf)** — extended methodology, statistical
+analyses, limitations, and appendices.
 
-![Streaming pipeline](assets/architecture.png)
+🎓 *CS348K Spring 2026 final project · Stanford University · Connor Ding,
+Ishita Gupta*
+
+---
 
 ## Motivation
 
@@ -17,231 +22,186 @@ The dominant evaluation paradigm for novel view synthesis — PSNR / SSIM /
 LPIPS computed on a held-out test camera — measures something different
 from what an end user actually experiences. Real users **drag the camera
 around interactively**, look where they want to look, and form an
-opinion that is conditioned on *which views* they chose to inspect. The
-pipeline lets us collect that opinion at scale.
+opinion conditioned on *which views* they chose to inspect. Numbers
+computed on a fixed set of static frames cannot see popping, floater
+drift, or smoothness artifacts that only show up under free navigation.
 
-The intended end-state: a graphics researcher who has just developed a
-new 3D reconstruction / NVS model can plug their renderer into this
-framework, recruit participants, and run a perception study against a
-baseline or in isolation. The current repository is a prototype of that
-vision.
+The intended end-state of this project: a graphics researcher with a
+new NVS method can plug their renderer into this framework, recruit
+participants, and run a perception study against a baseline or in
+isolation. The current repository ships a prototype of that vision,
+together with two case studies exercising it.
 
-Note that the goal is **not** to replace numerical metrics like PSNR and
-MS-SSIM — it is to provide a qualitative, interactive signal that those
-metrics cannot. We focus on indoor and outdoor **scenes** rather than
-synthetic objects.
+We do **not** aim to replace numerical metrics — they remain cheap,
+useful, and the right tool for in-the-loop training. We aim to provide
+the qualitative, interactive signal those metrics cannot.
 
-## What the framework collects
+## What we built
 
-Per stimulus (or per pair, in comparison mode):
+![Streaming pipeline](assets/architecture.png)
 
-- **Foreground quality** — 0–100 slider (the object of interest).
-- **Background quality** — 0–100 slider.
-- **Rendering smoothness** — 0–100 slider.
-- **Comparison-mode extras**
-  - Overall preference (7-point scale, –3 strongly-A → +3 strongly-B).
-  - Aspect attribution (multi-select: foreground / background / smoothness).
-- **Free-text comments** on the scene / session.
+The harness is renderer-agnostic: any process that consumes camera-pose
+deltas on a WebSocket and pushes H.264 over RTSP can plug in. The plug-in
+seam is the contract — register a route in `ws_mux.py` and a path in
+`mediamtx.yml` and the same browser viewer works.
 
-A planned post-session participant survey (Google Form, in preparation)
-will add direct self-report on perceived smoothness, UI clarity, and
-fatigue at session end.
+Per stimulus (or per pair, in comparison mode) we collect:
 
-## Case studies
+- **Foreground quality** — 0–100 slider (subject of the scene)
+- **Background quality** — 0–100 slider (surrounds, where NVS methods tend to struggle)
+- **Rendering smoothness** — 0–100 slider (only measurable under free navigation)
+- **Comparison-mode extras:** overall preference (7-point scale, −3 strongly-A → +3 strongly-B) and aspect attribution (multi-select)
+- **Free-text comments** on the scene
+- **Mouse trajectory log** over the viewing window
 
-We deploy the framework into two studies, each chosen to exercise a
-different mode (comparison vs. single-method) and to address a question
-that automated metrics cannot answer on their own. Per-study operational
-details (launchers, ports, ckpts) live in `CLAUDE.md`.
+Operational details — ports, launchers, mediamtx configuration — live in
+`CLAUDE.md` (local-only) and the launcher scripts themselves.
 
-### Case study 1 — i-NGP vs Nexels under matched budget
+## Two case studies
 
-**Question.** Given a feed-forward neural representation (Instant-NGP)
-and a neurally-textured-surfel representation (Nexels) trained to
-comparable storage budgets, *which one do humans actually prefer when
-they get to drive the camera*, and *which axis* (foreground, background,
-smoothness) drives that preference?
+We exercise the framework with two case studies, each chosen to ask a
+question that automated metrics cannot answer on their own.
 
-Launcher: `./start_methods.sh`. Viewer:
-`viewer/cross_method_side_by_side.html`.
+### Case 1 — i-NGP vs Nexels at matched storage (~14 MB / scene)
 
-Six mip-NeRF-360 scenes (`bicycle / counter / garden / kitchen / room /
-stump`) are shown one pair at a time, with `bonsai` as a fixed practice
-pair. Pair order shuffles per participant; A/B side coin-flips per pair;
-method-name reveal is blinded except in test mode. Both renderers stream
-concurrently into independently-draggable viewports.
+Two NVS methods (a pure-neural representation, [Instant-NGP], and a
+hybrid Gaussian-and-neural-network method, [Nexels]) rendered
+side-by-side in independently-orbitable viewports. Six mip-NeRF-360
+scenes (`bicycle / counter / garden / kitchen / room / stump`) plus
+one practice pair (`bonsai`). Per pair, participants rate
+foreground / background / smoothness for each side, pick an overall
+A/B preference, and indicate which aspects shaped that choice.
 
-The study is "successful" when (a) pooled overall-preference is
-sign-consistent across participants, (b) aspect-attribution histograms
-localise that gap to a specific axis, and (c) the smoothness slider
-isn't pinned at one end — i.e. the rating channels are actually carrying
-the signal.
+```bash
+./start_methods.sh
+# Open viewer/cross_method_side_by_side.html
+```
 
-### Case study 2 — perceptual convergence of 3DGS
+### Case 2 — Perceptual convergence of 3DGS
 
-**Question.** 3DGS trains for 30k iterations by default, but quality
-plateaus much earlier on many scenes. *At what iteration does additional
-training stop yielding perceptually meaningful gains?* And, secondarily,
-*how well do reference-image metrics (PSNR / SSIM / LPIPS) predict that
-plateau?* Agreement ⇒ cheap offline metrics are fine in this regime;
-disagreement ⇒ that's a story worth telling.
+A single method (3D Gaussian Splatting) trained for varying numbers
+of iterations (1k / 3k / 7k / 30k) on two Tanks-and-Temples scenes
+(`train`, `truck`). All eight checkpoints are GPU-resident so swapping
+between them is a constant-time pointer update. A per-scene reference
+slideshow plays once before each scene's rating block.
 
-Launcher: `./start_convergence.sh`. Viewer:
-`viewer/convergence_interactive.html`.
-
-Two scenes (`truck / train` from Tanks & Temples), each rendered from
-four 3DGS checkpoints (1k / 3k / 7k / 30k iters) — eight stimuli total.
-Scene order is randomised per participant; iters are shown ascending
-within each scene so the rater feels the convergence trajectory. A
-per-scene reference video (training photos as a slow slideshow) plays
-once before that scene's block.
-
-Read-out signals: (a) within-scene monotonicity in iter count, (b) a
-per-scene plateau iter where rating is statistically indistinguishable
-from 30k, and (c) Spearman rank correlation between each automated
-metric and the pooled human rating across the eight stimuli.
+```bash
+./start_convergence.sh
+# Open viewer/convergence_interactive.html
+```
 
 ---
 
-## Progress — Checkpoint 2 (2026-05-22)
-
-This section is the checkpoint snapshot of intermediate results. The
-tables and figures below are the data the framework has collected so
-far; the broader analysis lives in [`report/`](report/).
-
-### Systems status
-
-| Item | Status |
-|---|---|
-| Streaming harness (mediamtx / ws_mux / serve.py) | shipped, stable |
-| i-NGP renderer wrapper | shipped |
-| Nexels renderer wrapper | shipped |
-| 3DGS renderer wrapper + `swap_state` | shipped (8 ckpts GPU-resident) |
-| Comparison viewer (dual viewport) | shipped |
-| Convergence viewer (single viewport + reference slideshow) | shipped |
-| Submission persistence (full-snapshot JSON) | shipped |
-| End-to-end latency budget (render → display) | **pending measurement** |
-| Post-session participant satisfaction survey | **pending deployment** |
-
-Both case studies have run end-to-end without renderer stalls, dropped
-WebRTC streams, or mid-session abandonment. The comparison study
-sustains the 30 fps target at 1440×810 with both renderers active; the
-convergence study sustains the 60 fps target at 1920×1080. Checkpoint
-swaps in the convergence study introduce no measurable visual hitch.
+## Results
 
 ### Recruitment
 
-| Study | n (current) | n (target) |
-|---|---|---|
-| Comparison (i-NGP vs Nexels) | 9 | ~15 |
-| Convergence (3DGS at 4 iters) | 7 | ~15 |
+| Study | n (participants) |
+|---|---:|
+| Case 1 (comparison) | **18** |
+| Case 2 (convergence) | **12** |
+| Post-session satisfaction survey | **9** |
 
-### Intermediate results — comparison study (n = 9)
+### Case 1 results — humans and offline metrics disagree
 
-Per-scene offline metrics, FPS, storage footprint, and the mean human
-ratings collected to date. `fg / bg / sm` are mean 0–100 slider scores
-for foreground / background / rendering smoothness; `Votes` is the
-count of participants who preferred that method on that scene. `bonsai`
-is the practice scene and is excluded from the mean. LPIPS uses the
-AlexNet backbone across all methods.
+Nexels wins on every offline metric on every scene, but the human A/B
+vote is near-even in aggregate (44 / 49 / 12) and **`kitchen` reverses
+entirely** to 14 / 2 / 2 i-NGP — a sign-test *p* = 0.004 reversal of
+the offline ranking that every numerical metric supports.
 
-| Scene | Method | PSNR↑ | SSIM↑ | LPIPS↓ | FPS | MB | fg↑ | bg↑ | sm↑ | Votes |
-|---|---|---|---|---|---|---|---|---|---|---|
-| bicycle | i-NGP  | 21.93 | 0.462 | 0.592 | **62.0** | 14.5 | 74.3 | 42.6 | 74.0 | 1 |
-|         | Nexels | **22.21** | **0.539** | **0.424** | 29.5 | **14.4** | **83.7** | **68.7** | **79.6** | **7** |
-| counter | i-NGP  | 25.31 | 0.757 | 0.272 | **61.5** | **13.5** | 68.3 | 52.1 | **55.2** | 2 |
-|         | Nexels | **26.42** | **0.833** | **0.216** | 30.0 | 14.4 | **71.1** | **62.1** | 51.8 | **6** |
-| garden  | i-NGP  | 23.13 | 0.514 | 0.456 | **74.9** | **12.0** | 71.3 | 66.3 | **49.3** | 3 |
-|         | Nexels | **23.46** | **0.636** | **0.322** | 34.0 | 14.4 | **79.9** | **74.9** | 47.1 | 3 |
-| kitchen | i-NGP  | 27.12 | 0.767 | 0.214 | **96.2** | **12.6** | **81.1** | **63.2** | **63.7** | **8** |
-|         | Nexels | **27.68** | **0.861** | **0.167** | 31.9 | 14.4 | 52.0 | 46.7 | 34.7 | 0 |
-| room    | i-NGP  | 28.47 | 0.844 | 0.225 | **69.8** | 15.0 | 48.0 | 55.6 | 56.1 | **5** |
-|         | Nexels | **29.15** | **0.877** | **0.207** | 29.8 | **14.4** | **57.7** | **56.7** | **57.6** | 3 |
-| stump   | i-NGP  | 21.68 | 0.473 | 0.574 | 27.0 | 16.0 | 59.8 | **52.7** | **62.0** | 2 |
-|         | Nexels | **23.88** | **0.604** | **0.398** | **32.9** | **14.4** | **73.2** | 47.3 | 56.3 | **7** |
-| **mean (6)** | i-NGP | 24.61 | 0.636 | 0.389 | **65.2** | 13.9 | 67.1 | 55.4 | **60.1** | 21 |
-|              | Nexels | **25.47** | **0.725** | **0.289** | 31.4 | 14.4 | **69.6** | **59.4** | 54.5 | **26** |
+![Per-scene preference with strength gradient](assets/fig_preference_per_scene.png)
 
-Aggregate A/B preference 21 / 26 / 7 (i-NGP / Nexels / tie), close to
-even. The per-scene picture (figure below) is the more interesting view
-— scene-by-scene preferences are heterogeneous and `kitchen` reverses
-entirely to i-NGP despite Nexels winning every offline metric on that
-scene.
+| Scene | PSNR↑ (i-NGP / Nex) | LPIPS↓ (i-NGP / Nex) | FPS (i-NGP / Nex) | Votes (i-NGP / Tie / Nex) |
+|---|---:|---:|---:|---:|
+| bicycle | 21.9 / **22.2** | 0.59 / **0.42** | **62** / 30 | 2 / 3 / **13** |
+| counter | 25.3 / **26.4** | 0.27 / **0.22** | **62** / 30 | 6 / 1 / **10** |
+| garden | 23.1 / **23.5** | 0.46 / **0.32** | **75** / 34 | 7 / 4 / 7 |
+| **kitchen** | 27.1 / **27.7** | 0.21 / **0.17** | **96** / 32 | **14** / 2 / 2 |
+| room | 28.5 / **29.2** | 0.23 / **0.21** | **70** / 30 | **10** / 1 / 6 |
+| stump | 21.7 / **23.9** | 0.57 / **0.40** | 27 / **33** | 5 / 1 / **11** |
 
-![Per-scene A/B preference](assets/fig_preference_per_scene.png)
+(`bonsai` excluded — practice pair. Bold marks the per-scene winner on each column.)
 
-### Intermediate results — convergence study (n = 7)
+### Case 1 results — why they disagreed
 
-Per-stimulus offline metrics and mean human ratings (3DGS at four
-checkpoint counts on Tanks-and-Temples `train` and `truck`). LPIPS is
-AlexNet (gsplat default). FPS is `ellipse_time` at the gsplat eval
-resolution and is an upper bound on the interactive frame rate at
-1920×1080.
+Looking inside each scene, Nexels has the edge on **detail** (foreground
+and background) — but i-NGP has the edge on **motion**, winning the
+smoothness slider on five of six scenes. The kitchen reversal is the
+extreme case: the smoothness gap (28 points) outweighs Nexels' edge on
+the other two aspects.
 
-| Scene | Iters | PSNR↑ | SSIM↑ | LPIPS↓ | FPS | # Splats | fg↑ | bg↑ | sm↑ |
-|---|---|---|---|---|---|---|---|---|---|
-| train | 1k  | 17.06 | 0.584 | 0.550 | 433.7 | 0.21M | 45.0 | 27.9 | 79.4 |
-|       | 3k  | 18.75 | 0.650 | 0.413 | 254.1 | 0.49M | 61.1 | 37.4 | 76.6 |
-|       | 7k  | 19.73 | 0.721 | 0.298 | 130.8 | 1.05M | 79.1 | 49.4 | 89.9 |
-|       | 30k | 21.44 | 0.812 | 0.146 |  77.4 | 1.81M | 88.4 | 66.0 | 91.7 |
-| truck | 1k  | 20.94 | 0.725 | 0.326 | 437.5 | 0.21M | 35.9 | 40.6 | 76.4 |
-|       | 3k  | 22.65 | 0.800 | 0.207 | 144.0 | 1.14M | 56.1 | 56.0 | 84.9 |
-|       | 7k  | 23.87 | 0.845 | 0.143 |  67.6 | 2.51M | 75.1 | 65.1 | 86.9 |
-|       | 30k | 25.04 | 0.871 | 0.095 |  45.5 | 3.79M | 77.7 | 63.3 | 81.3 |
+![Per-scene mean ratings by aspect](assets/fig_per_scene_ratings.png)
 
-The `train` scene shows monotone improvement on all three aspects from
-1k → 30k. The `truck` scene saturates: foreground goes 75.1 → 77.7 from
-7k → 30k while smoothness drops from 86.9 → 81.3 over the same
-interval, mirroring the FPS drop from 68 to 46 as the splat count grows
-from 2.5M to 3.8M.
+The asymmetry shows up cleanly in *which aspects participants cited* as
+the reason for their A/B choice (Appendix B Table 5 in the report).
+Nexels-choosing citers mention background 38 times across all scenes
+but smoothness only 12 — a 3× gap. i-NGP-choosing citers cite all three
+aspects nearly equally (24 / 21 / 22). The headline: **Nexels voters
+were voting on what they saw; i-NGP voters were voting on what they saw
+*and* how it moved.** This is the FPS-matters finding stated without a
+regression.
+
+### Case 2 results — `truck` smoothness regresses at 30k
+
+`train` improves monotonically on all three aspects from 1k → 30k.
+`truck` is different: foreground saturates between 7k and 30k, and
+**smoothness drops 23 points** (82.9 → 60.1) as the model grows from
+2.5M splats at 7k to 3.8M at 30k. Offline LPIPS keeps improving
+(0.143 → 0.095), but the participant feels the frame-time tax.
 
 ![Convergence ratings vs offline LPIPS](assets/fig_convergence.png)
 
-### Against the framework's own success criteria
+In compute-budgeting terms: for `truck`, training 3DGS 4× longer past
+7k buys a 34% LPIPS improvement participants do not perceive, while
+costing enough rendering speed that smoothness ratings drop measurably.
+Offline metrics on still held-out images would not have seen this.
 
-Stated success criteria (from the case-study descriptions above) vs.
-what the current data shows:
+### Participant satisfaction (n=9)
 
-**Comparison study.**
+![Post-session participant survey](assets/fig_participant_feedback.png)
 
-- *Pooled overall-preference sign-consistent across participants* —
-  Partially. The aggregate is near-tie (21/26/7) but per-scene
-  preferences are sign-consistent within scene (e.g. `kitchen` 8-0-1
-  i-NGP; `bicycle` 7-1-1 Nexels). Sign-consistency at the aggregate
-  level fails; sign-consistency at the per-scene level holds.
-- *Aspect-attribution histograms localise the gap* — Yes. Background
-  citations push toward Nexels; smoothness citations push toward i-NGP.
-- *Smoothness slider is not pinned* — Yes. Smoothness ratings span
-  34.7 (kitchen / Nexels) to 79.6 (bicycle / Nexels).
+Participants reported **overall positive feedback** — *"really impressed
+by the different spaces it could capture"* · *"really liked this one
+— clear how much better things were improving over time"* · *"VERY CLEAR
+INSTRUCTIONS!"* — with **common suggestions** including a reset-view
+button, less-sensitive zoom, consistent camera-drag direction, and the
+ability to revise earlier ratings.
 
-**Convergence study.**
+The strongest dimensions are overall experience (mean 4.4 / 5) and
+instruction clarity (4.4 / 5). The weakest is viewer ease of use
+(mean 3.6 / 5), where one participant rated it 2 — the same participant
+who reported the highest mental fatigue.
 
-- *Within-scene monotonicity in iter count* — Yes on `train` across all
-  aspects; no on `truck` (smoothness drops 7k → 30k).
-- *Per-scene plateau iter* — Identifiable on `truck` (foreground
-  saturates by 7k). On `train` no plateau is visible by 30k.
-- *Spearman rank correlation between automated metrics and pooled
-  rating* — Computed but parked in the report appendix as an example
-  analysis rather than a headline claim; we are positioning the
-  framework as a data-gathering platform rather than an analysis
-  package.
+## Try it / reproduce
 
-### What's still open
+The system runs on a single GPU instance (we used AWS L4, 24 GB VRAM).
+Open ports `8080 · 8765 · 8889 · 8189` (RTSP `8554` is internal-only).
 
-- **Recruitment.** Push n to ~15 per study before final submission.
-- **Participant satisfaction.** Deploy the post-session Google Form
-  survey so participant-side success has a direct measurement, not just
-  the indirect indicators (completion rate, no abandons) we have now.
-- **End-to-end latency.** Measure and publish a render → encode →
-  network → decode → display latency budget; defend the
-  "imperceptible latency" claim with numbers.
-- **Inter-rater agreement.** Compute Kendall's W on A/B preference and
-  ICC(2,k) on per-aspect slider scores once n ≥ 15.
-- **Cross-cutting analysis (planned extension).** Mouse-trajectory
-  logging is not yet implemented; once it is, the
-  static-vs-interactive replay analysis (would the rating have come
-  out the same if the participant only saw the held-out test camera?)
-  becomes possible. Out of scope for this checkpoint.
+```bash
+# Install dependencies
+./install.sh
+
+# Run the comparison case study (i-NGP vs Nexels)
+./start_methods.sh                  # default SIZE=small
+SIZE=medium ./start_methods.sh      # larger model tier
+
+# Run the convergence case study (3DGS at 4 iter counts)
+./start_convergence.sh
+DEFAULT=train:1k ./start_convergence.sh   # start at a different ckpt
+```
+
+Open the viewer in a browser:
+- Comparison: `http://<GPU_IP>:8080/viewer/cross_method_side_by_side.html`
+- Convergence: `http://<GPU_IP>:8080/viewer/convergence_interactive.html`
+
+Replace `<GPU_IP>` with whatever `curl ifconfig.me` reports on the GPU
+host. The launchers self-heal the public-IP advertisement in
+`mediamtx.yml`, so first-time launch works without manual config edits.
+
+To add a new renderer, see the renderer contract in
+[`report/main.pdf`](report/main.pdf) §2.2 — at a high level, expose a
+WebSocket port for pose deltas, push H.264 over RTSP, and register one
+line in `ws_mux.py` and one in `mediamtx.yml`.
 
 ---
 
@@ -252,8 +212,8 @@ interactive-3d-human-eval/
   README.md                        this file
   install.sh
 
-  start_methods.sh                 launcher: comparison study
-  start_convergence.sh             launcher: convergence study
+  start_methods.sh                 launcher: comparison case study
+  start_convergence.sh             launcher: convergence case study
 
   interactive_renderer.py          i-NGP renderer (pyngp, headless)
   nexels_renderer.py               Nexels renderer (diff-nexel-rasterization)
@@ -263,8 +223,24 @@ interactive-3d-human-eval/
   mediamtx.yml                     mediamtx config
 
   viewer/
-    cross_method_side_by_side.html comparison study (active)
-    convergence_interactive.html   convergence study (active)
+    cross_method_side_by_side.html comparison case study
+    convergence_interactive.html   convergence case study
 
   assets/                          architecture diagram, result figures, demo GIF
 ```
+
+## References & links
+
+- 📄 **Full report (PDF):** [`report/main.pdf`](report/main.pdf)
+- 🖼 **Result figures:** [`assets/`](assets/)
+- The renderer wrappers build on
+  [`pyngp`](https://github.com/NVlabs/instant-ngp) (Instant-NGP),
+  `diff-nexel-rasterization` (Nexels),
+  and [`gsplat`](https://github.com/nerfstudio-project/gsplat) (3D
+  Gaussian Splatting).
+- Datasets: [mip-NeRF-360] and [Tanks and Temples].
+
+[Instant-NGP]: https://nvlabs.github.io/instant-ngp/
+[Nexels]: https://github.com/example/nexels
+[mip-NeRF-360]: https://jonbarron.info/mipnerf360/
+[Tanks and Temples]: https://www.tanksandtemples.org/
