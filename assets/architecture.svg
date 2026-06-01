@@ -1,0 +1,121 @@
+<svg viewBox="0 0 900 540" xmlns="http://www.w3.org/2000/svg" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="frame-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#c0392b"/>
+    </marker>
+    <marker id="event-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#1f4e79"/>
+    </marker>
+    <marker id="http-arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L0,6 L9,3 z" fill="#6b7280"/>
+    </marker>
+  </defs>
+
+  <!-- Title -->
+  <text x="450" y="28" font-size="14" font-weight="bold" text-anchor="middle" fill="#0f172a">Streaming pipeline for interactive 3D human evaluation</text>
+
+  <!-- ====== Renderers box ====== -->
+  <rect x="40" y="100" width="220" height="280" rx="8" fill="#eef2f7" stroke="#475569" stroke-width="1.2"/>
+  <text x="55" y="120" font-size="12" font-weight="bold" fill="#0f172a">Renderers (GPU-resident)</text>
+
+  <g font-size="11" fill="#111827">
+    <rect x="55" y="135" width="190" height="65" rx="4" fill="white" stroke="#374151" stroke-width="1"/>
+    <text x="65" y="153" font-weight="bold">i-NGP renderer</text>
+    <text x="65" y="170" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#374151">interactive_renderer.py</text>
+    <text x="65" y="185" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#374151">WS 8767 · RTSP /ingp</text>
+
+    <rect x="55" y="210" width="190" height="65" rx="4" fill="white" stroke="#374151" stroke-width="1"/>
+    <text x="65" y="228" font-weight="bold">Nexels renderer</text>
+    <text x="65" y="245" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#374151">nexels_renderer.py</text>
+    <text x="65" y="260" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#374151">WS 8768 · RTSP /nexel</text>
+
+    <rect x="55" y="285" width="190" height="65" rx="4" fill="white" stroke="#374151" stroke-width="1"/>
+    <text x="65" y="303" font-weight="bold">3DGS renderer</text>
+    <text x="65" y="320" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#374151">gsplat_renderer.py</text>
+    <text x="65" y="335" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#374151">WS 8769 · RTSP /3dgs</text>
+  </g>
+
+  <text x="40" y="400" font-size="10" font-style="italic" fill="#475569">2 active in comparison study (i-NGP || Nexels)</text>
+  <text x="40" y="414" font-size="10" font-style="italic" fill="#475569">1 active in convergence (3DGS w/ swap_state)</text>
+
+  <!-- ====== mediamtx ====== -->
+  <rect x="340" y="100" width="220" height="90" rx="6" fill="white" stroke="#374151" stroke-width="1.2"/>
+  <text x="355" y="120" font-size="12" font-weight="bold" fill="#111827">mediamtx (frame relay)</text>
+  <text x="355" y="138" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#374151">RTSP ingest   8554</text>
+  <text x="355" y="153" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#374151">WHEP egress   8889</text>
+  <text x="355" y="168" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#374151">ICE-TCP       8189</text>
+
+  <!-- ====== ws_mux ====== -->
+  <rect x="340" y="220" width="220" height="80" rx="6" fill="white" stroke="#374151" stroke-width="1.2"/>
+  <text x="355" y="240" font-size="12" font-weight="bold" fill="#111827">ws_mux.py (event router)</text>
+  <text x="355" y="258" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#374151">browser WS    8765</text>
+  <text x="355" y="273" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#374151">→ /ingp /nexel /3dgs</text>
+  <text x="355" y="288" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#374151">  (8767 / 8768 / 8769)</text>
+
+  <!-- ====== serve.py ====== -->
+  <rect x="340" y="330" width="220" height="80" rx="6" fill="white" stroke="#374151" stroke-width="1.2"/>
+  <text x="355" y="350" font-size="12" font-weight="bold" fill="#111827">serve.py</text>
+  <text x="355" y="368" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#374151">HTTP 8080</text>
+  <text x="355" y="383" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#374151">static + POST /submit</text>
+  <text x="355" y="398" font-family="ui-monospace,Menlo,monospace" font-size="10" fill="#374151">→ responses/*.json</text>
+
+  <!-- ====== Browser ====== -->
+  <rect x="640" y="100" width="220" height="310" rx="8" fill="#f0f7ee" stroke="#475569" stroke-width="1.2"/>
+  <text x="655" y="120" font-size="12" font-weight="bold" fill="#0f172a">Browser (participant)</text>
+
+  <rect x="655" y="135" width="190" height="65" rx="4" fill="white" stroke="#374151" stroke-width="1"/>
+  <text x="665" y="153" font-size="11" font-weight="bold" fill="#111827">&lt;video&gt; element</text>
+  <text x="665" y="170" font-size="10" fill="#374151">decodes WebRTC</text>
+  <text x="665" y="185" font-size="10" font-family="ui-monospace,Menlo,monospace" fill="#374151">1440×810@30 or 1920×1080@60</text>
+
+  <rect x="655" y="210" width="190" height="65" rx="4" fill="white" stroke="#374151" stroke-width="1"/>
+  <text x="665" y="228" font-size="11" font-weight="bold" fill="#111827">Camera controller</text>
+  <text x="665" y="245" font-size="10" fill="#374151">pointer / keyboard</text>
+  <text x="665" y="260" font-size="10" fill="#374151">→ pose deltas + swap_state</text>
+
+  <rect x="655" y="285" width="190" height="105" rx="4" fill="white" stroke="#374151" stroke-width="1"/>
+  <text x="665" y="303" font-size="11" font-weight="bold" fill="#111827">viewer HTML + rating UI</text>
+  <text x="665" y="320" font-size="10" font-family="ui-monospace,Menlo,monospace" fill="#374151">cross_method_side_by_side.html</text>
+  <text x="665" y="335" font-size="10" font-family="ui-monospace,Menlo,monospace" fill="#374151">convergence_interactive.html</text>
+  <text x="665" y="355" font-size="10" fill="#374151">0–100 sliders, A/B preference,</text>
+  <text x="665" y="370" font-size="10" fill="#374151">aspect multi-select →</text>
+  <text x="665" y="384" font-size="10" font-family="ui-monospace,Menlo,monospace" fill="#374151">snapshot JSON</text>
+
+  <!-- ====== Arrows ====== -->
+  <!-- Frame flow: Renderers → mediamtx -->
+  <path d="M 260 160 L 340 140" stroke="#c0392b" stroke-width="2" fill="none" marker-end="url(#frame-arrow)"/>
+  <text x="268" y="133" font-size="10" font-weight="bold" fill="#c0392b">RTSP 8554</text>
+
+  <!-- Frame flow: mediamtx → browser video -->
+  <path d="M 560 145 L 640 165" stroke="#c0392b" stroke-width="2" fill="none" marker-end="url(#frame-arrow)"/>
+  <text x="568" y="135" font-size="10" font-weight="bold" fill="#c0392b">WebRTC (WHEP/ICE)</text>
+
+  <!-- Event flow: browser camera → ws_mux -->
+  <path d="M 640 240 L 560 255" stroke="#1f4e79" stroke-width="2" fill="none" marker-end="url(#event-arrow)"/>
+  <text x="570" y="232" font-size="10" font-weight="bold" fill="#1f4e79">WS 8765</text>
+
+  <!-- Event flow: ws_mux → renderers -->
+  <path d="M 340 260 L 260 300" stroke="#1f4e79" stroke-width="2" fill="none" marker-end="url(#event-arrow)"/>
+  <text x="265" y="278" font-size="10" font-weight="bold" fill="#1f4e79">per-method WS</text>
+
+  <!-- HTTP flow: browser UI ↔ serve.py -->
+  <path d="M 640 350 L 560 365" stroke="#6b7280" stroke-width="1.8" fill="none" marker-end="url(#http-arrow)"/>
+  <path d="M 560 385 L 640 378" stroke="#6b7280" stroke-width="1.8" fill="none" marker-end="url(#http-arrow)"/>
+  <text x="570" y="345" font-size="10" fill="#6b7280">GET static</text>
+  <text x="570" y="405" font-size="10" fill="#6b7280">POST /submit</text>
+
+  <!-- ====== Legend ====== -->
+  <rect x="40" y="440" width="820" height="80" rx="6" fill="white" stroke="#cbd5e1" stroke-width="1"/>
+  <text x="55" y="460" font-size="11" font-weight="bold" fill="#0f172a">Legend</text>
+
+  <line x1="55" y1="478" x2="105" y2="478" stroke="#c0392b" stroke-width="2.5"/>
+  <text x="113" y="482" font-size="11" fill="#1e293b">Frames out — renderer → browser</text>
+
+  <line x1="340" y1="478" x2="390" y2="478" stroke="#1f4e79" stroke-width="2.5"/>
+  <text x="398" y="482" font-size="11" fill="#1e293b">Events in — browser → renderer</text>
+
+  <line x1="610" y1="478" x2="660" y2="478" stroke="#6b7280" stroke-width="2.5"/>
+  <text x="668" y="482" font-size="11" fill="#1e293b">HTTP static / submissions</text>
+
+  <text x="55" y="504" font-size="10" fill="#475569">Plug-in seam: a new renderer joins by registering one route in <tspan font-family="ui-monospace,Menlo,monospace">ws_mux.py</tspan> and publishing one RTSP path in <tspan font-family="ui-monospace,Menlo,monospace">mediamtx.yml</tspan>; the browser stays renderer-agnostic.</text>
+</svg>

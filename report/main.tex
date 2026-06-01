@@ -1,0 +1,48 @@
+% main.tex — CS348K final report
+%
+% Minimal wrapper so the section files compile standalone. If you already
+% have a main.tex in Overleaf, just \input the section files from there or
+% copy the body of section_1.tex into your existing document.
+%
+% Build:  pdflatex main && bibtex main && pdflatex main && pdflatex main
+
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\graphicspath{{../assets/}{assets/}}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage[round]{natbib}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!50!black,
+    citecolor=blue!50!black,
+    urlcolor=blue!50!black,
+}
+
+\title{An Interactive Streaming Harness for Human Evaluation of\\Real-Time 3D Renderers}
+\author{Connor Ding \texttt{<czsding@stanford.edu>} \\
+        \textit{[teammate name]} \texttt{<[teammate-email]>}}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\input{section_1}
+\input{section_2}
+\input{section_3}
+\input{section_4}
+\input{section_appendix}
+% \input{section_5}  % References — emit via \bibliography below
+
+\bibliographystyle{plainnat}
+\bibliography{refs}
+
+\end{document}

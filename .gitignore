@@ -32,5 +32,24 @@ analysis/
 # Offline metrics tables — too noisy / WIP for the public repo
 method_metrics/
 
-# CS348K report drafts — kept local while iterating
-report/
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.synctex.gz
+*.toc
+
+# Participant data — contains initials/timestamps, keep private
+*_ratings.csv
+text_responses.json
+methods_metrics.zip
+
+# Internal planning / drafting documents
+presentation_notes.md
+report_outline.md
+build_feedback_form.gs
+
+# Slide deck source (Canva export)
+Novel View Synthesis.pdf

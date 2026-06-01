@@ -1,0 +1,163 @@
+% section_2.tex — Approach (questionnaire design + streaming platform)
+
+\section{Approach}
+\label{sec:approach}
+
+We start from existing third-party renderer implementations for the
+three NVS methods we evaluate --- \texttt{pyngp} for
+i-NGP~\citep{mueller2022instantngp},
+\texttt{diff-nexel-rasterization} for Nexels~\citep{nexels}, and
+\texttt{gsplat}~\citep{ye2024gsplat} for 3D Gaussian
+Splatting~\citep{kerbl20233dgs}. What those projects do not ship is the
+instrument: there is no agreed-upon questionnaire for asking a
+participant how good a real-time 3D rendering feels, and no
+off-the-shelf platform that runs such a questionnaire while the
+participant interactively views a live render. The contribution of this
+work is, in order of importance, the design of that questionnaire
+(\S\ref{sec:questionnaire}) and the streaming harness that lets it run
+(\S\ref{sec:platform}).
+
+\subsection{Questionnaire design}
+\label{sec:questionnaire}
+
+\paragraph{Decomposing ``quality''.}
+A single overall ``how good is this rendering'' rating is hard to
+interpret across scenes and methods: it averages over different failure
+modes, and the participant's internal weighting is opaque. We instead
+decompose perceived quality into three sub-aspects that we elicit
+separately:
+\begin{enumerate}
+    \item \emph{Foreground detail} --- sharpness and fidelity on the
+    nominal subject of the captured photographs.
+    \item \emph{Background detail} --- sharpness, fidelity, and absence
+    of floater artifacts on the surrounding regions, which NVS methods
+    tend to struggle with more than the foreground.
+    \item \emph{Motion smoothness} --- continuity of the rendering during
+    free navigation. This is the one aspect that \emph{requires}
+    interactive viewing to evaluate at all.
+\end{enumerate}
+The first two are familiar from still-image quality work; the third is
+the explicit reason this study exists as a streaming harness rather than
+an image grader. The three axes also align with the kinds of design
+tradeoffs an NVS researcher actually reasons about --- model capacity
+allocated to subject vs.\ surroundings, and the speed cost of additional
+parameters or splats.
+
+\paragraph{Sliders rather than Likert.}
+Each aspect is rated on a continuous 0--100 slider with the endpoints
+labeled (``poor'' and ``excellent'') and the midpoint unlabeled. We
+chose continuous sliders over a 5-point Likert scale for two reasons:
+(i) sliders avoid the anchor-driven clustering that compresses Likert
+distributions toward one or two modes, and (ii) on a 0--100 scale a
+single within-participant slider can be correlated directly against an
+offline metric on the same axis, which a 5-bucket categorical cannot.
+
+\paragraph{Two-method comparison: independent viewports, forced A/B,
+aspect citation.}
+For the two-method comparison the participant sees two
+\emph{independently orbitable} viewports side by side, with method
+identities hidden behind anonymous badges (only the \texttt{test}
+initials hook reveals them, and is never used in real sessions).
+Independence is deliberate: a single baked camera trajectory would
+dictate which artifacts the participant ever sees, but pilot sessions
+confirmed that participants want to \emph{probe} the scene --- zooming
+on suspicious regions, viewing the subject from oblique angles --- and
+the artifacts they probe (popping, smoothness, floaters at grazing
+angles) are precisely the ones a fixed trajectory would either hide or
+showcase. After exploring a pair, the participant fills out per-side
+foreground / background / smoothness sliders, then makes a forced A/B
+overall preference (``A'', ``B'', or explicit tie), then selects from a
+multi-select list \emph{which} aspect(s) shaped that choice. The
+slider-then-A/B redundancy is intentional: we collect both a graded
+within-method rating and a categorical between-method judgment per
+trial, and the aspect multi-select converts an aggregate preference
+into something mechanistic --- which aspect, on which scene, swung the
+choice.
+
+\paragraph{Single-method convergence: ratings in isolation, reference
+anchor.}
+The convergence case uses the same primitives in a different shape. The
+participant sees one viewport, rendering one stimulus (here: a 3DGS
+checkpoint at a given training-iteration count) at a time; the active
+stimulus is swapped without a process restart, so the only thing that
+changes between consecutive stimuli is the model state. We deliberately
+rate each stimulus in isolation rather than as A/B against the previous
+one, since the stimuli are not always commensurable on a single axis of
+merit and a forced choice would discard graded information. Per
+stimulus we collect two sliders --- overall quality and motion
+smoothness --- on the same 0--100 scale as the comparison case. To
+give the participant a ground-truth anchor for what the scene
+\emph{should} look like, we play a low-frame-rate slideshow of the
+training photographs for the scene once before its rating block; an
+NVS rendering on its own provides no reference for ``how detailed
+should this actually be''.
+
+\subsection{Streaming platform}
+\label{sec:platform}
+
+The streaming pipeline exists to let either questionnaire above run
+while the participant views a live render rather than a pre-baked
+trajectory, despite participants connecting from their own
+(typically GPU-less) laptops, and despite the underlying renderers
+having different native rendering stacks --- the two constraints
+flagged in \S\ref{sec:background}. The platform is, by intent, the
+smaller half of the contribution: it is what allowed us to ship the
+questionnaire, not a research artifact in itself.
+
+\paragraph{Pipeline.}
+Each renderer is wrapped in a thin process
+(\texttt{interactive\_renderer.py},
+\texttt{nexels\_renderer.py}, \texttt{gsplat\_renderer.py}) that
+consumes camera-pose deltas on a per-method WebSocket and pushes H.264
+over RTSP to a \texttt{mediamtx} instance, which relays to the browser
+over WebRTC (WHEP). A single browser-facing WebSocket multiplexer
+(\texttt{ws\_mux.py}) routes pose-delta messages to the right renderer
+based on URL path, and a static HTTP server (\texttt{serve.py}) hosts
+the viewer pages and accepts rating submissions. All server-side
+processes colocate on a single AWS L4 GPU instance.
+Figure~\ref{fig:architecture} shows the resulting data flow.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{architecture}
+  \caption{Streaming pipeline. The three renderers conform to a common
+  contract (RTSP push for frames out, per-method WebSocket for events
+  in); \texttt{ws\_mux.py} and \texttt{mediamtx} between them keep the
+  browser renderer-agnostic.}
+  \label{fig:architecture}
+\end{figure}
+
+\paragraph{Plug-and-play seam.}
+The principal design choice on the platform side is the contract every
+renderer must satisfy: (a) accept camera-pose deltas as JSON messages
+on a per-method WebSocket port; (b) push H.264 over RTSP at the
+configured target resolution and frame rate (1440$\times$810@30 for the
+comparison case, 1920$\times$1080@60 for the convergence case); and
+(c) optionally accept a \texttt{swap\_state} message used by the
+convergence case to flip the active checkpoint without restarting the
+renderer process. Any process that meets this contract drops in by
+registering a route in \texttt{ws\_mux.py} and a corresponding RTSP
+path in \texttt{mediamtx.yml}. The browser never has to know which
+underlying method is active --- the same viewer HTML works for any
+renderer that honors the contract, and the marginal cost of adding a
+third method is a few lines of configuration rather than a viewer
+rewrite.
+
+\paragraph{What did not work.}
+Two earlier designs are preserved in \texttt{archive/}. We initially
+considered a fully pre-rendered evaluation built on canned camera
+trajectories rendered to MP4
+(\texttt{archive/start\_noninteractive.sh}), but pilot sessions
+surfaced exactly the central limitation that motivated the streaming
+approach: participants could not probe the artifacts they wanted to
+talk about. We then tried a single-renderer interactive pipeline built
+on Xvfb plus each renderer's native UI, with \texttt{event\_relay.py}
+translating browser WebSocket events into \texttt{xdotool} keystrokes
+(\texttt{archive/start\_interactive.sh}). This worked end-to-end but
+end-to-end latency was high (the screen-capture path added tens of
+milliseconds), and the design did not generalize to running two
+renderers concurrently for a side-by-side comparison because each one
+demanded its own X display. The current architecture --- renderers
+that push H.264 directly to mediamtx, browser receives via WebRTC,
+event mux that routes per-method WebSockets --- replaced both of these
+and is substantially simpler.

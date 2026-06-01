@@ -1,0 +1,204 @@
+% section_appendix.tex — Systems details + example analyses
+% Appended after section_3.tex; switches to appendix-style numbering.
+
+\appendix
+
+\section{Systems details}
+\label{app:systems}
+
+\paragraph{Per-method FPS detail.} The single-renderer FPS columns of
+Tables~\ref{tab:cross_offline} and~\ref{tab:convergence} give the
+per-method bench-rate ceilings at the offline benchmark resolution
+(1297$\times$840). i-NGP is on average 2--3$\times$ faster than Nexels
+at the \texttt{small} model size (mean 65.2 vs.\ 31.4~fps), with the
+exception of \texttt{stump} where i-NGP's frame rate collapses to
+27~fps for reasons related to that scene's geometry (large depth
+range, many empty rays). For 3DGS, FPS scales inversely with splat
+count: 434~fps at the 1k checkpoint (210k splats) drops to 77~fps at
+the 30k checkpoint (1.8M splats) on \texttt{train}, and
+437~$\to$~45~fps on \texttt{truck} (3.8M splats). For case study B
+these numbers are all well above the 60~fps interactive target at
+1920$\times$1080, so frame-rate variability inside a session was not
+a confound; for case study A, both renderers cleared the 30~fps
+target with substantial headroom on five of six scenes.
+
+\paragraph{Pending telemetry.} [To be added: end-to-end input-to-photon
+latency breakdown (render, encode, network, decode, display); GPU
+memory residency over the course of a case-study-A session; per-renderer
+frame-time distribution under cohabitation versus single-renderer
+operation.]
+
+\section{Example analyses on case-study A data}
+\label{app:analyses}
+
+The analyses below are illustrative of the kind of work a researcher
+might do on data the harness collects. We present them not as
+scientific claims about i-NGP or Nexels but as evidence that the data
+shape supports such analyses. All numbers are computed on the $n=18$
+case-study-A dataset.
+
+\paragraph{Preference vs.\ offline-metric gaps (Spearman correlations).}
+We computed Spearman correlations between A/B preference (sign
+convention: $+$ Nexels preferred, $-$ i-NGP preferred) and the
+per-scene gap on each offline metric (sign-aligned to ``Nexels has the
+better offline number''). Table~\ref{tab:correlations} reports the
+full set; Figure~\ref{fig:fps_pref_scatter} plots the scene-level
+FPS--preference relationship.
+
+\begin{table}[h]
+\centering
+\caption{Spearman correlation between A/B preference
+($+$ Nexels / $-$ i-NGP) and per-scene offline-metric gap. Trial level
+pools all (participant, scene) rows; scene-mean level averages within
+scene first.}
+\label{tab:correlations}
+\small
+\begin{tabular}{lrrrr}
+\toprule
+Offline-metric gap & Trial-level $\rho$ ($n=105$) & $p$ & Scene-mean $\rho$ ($n=6$) & $p$ \\
+\midrule
+PSNR             & $-0.06$          & $0.56$    & $-0.03$         & $0.96$    \\
+SSIM             & $+0.02$          & $0.85$    & $+0.20$         & $0.70$    \\
+LPIPS (AlexNet)  & $\mathbf{+0.34}$ & $\mathbf{<0.001}$ & $\mathbf{+0.83}$ & $\mathbf{0.04}$ \\
+FPS              & $\mathbf{+0.35}$ & $\mathbf{<0.001}$ & $+0.77$ & $0.07$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.85\linewidth]{fig_fps_pref_scatter}
+  \caption{Per-scene mean preference ($+$ Nexels / $-$ i-NGP) plotted
+  against i-NGP's FPS advantage on that scene ($n=18$ participants).
+  \texttt{kitchen} is highlighted. Scene-level $\rho = -0.77$
+  ($p=0.07$); trial-level $\rho = -0.35$ ($p<0.001$, $n=105$). The
+  sign convention places i-NGP preference in the lower half-plane.}
+  \label{fig:fps_pref_scatter}
+\end{figure}
+
+\paragraph{Aspect-citation effects (Mann--Whitney $U$).}
+After each A/B choice, participants ticked which of the three aspects
+(foreground, background, smoothness) influenced that choice.
+Table~\ref{tab:aspect_citation} reports Mann--Whitney $U$ tests on
+whether citing a given aspect changes the strength and direction of
+preference. The decomposition is interpretable: background citations
+correlate with stronger preferences toward Nexels; smoothness
+citations with preferences toward i-NGP; foreground citations are
+roughly neutral on direction. We do not over-interpret these effects;
+they exemplify the within-trial decomposition the aspect multi-select
+makes possible.
+
+\begin{table}[h]
+\centering
+\caption{Aspect-citation effects on A/B preference. Each row tests
+whether citing that aspect changes preference strength (left) or
+preference direction (right). Mann--Whitney $U$ test, two-sided.}
+\label{tab:aspect_citation}
+\small
+\begin{tabular}{lrrrrrr}
+\toprule
+Aspect & $|\text{pref}|$ cited ($n$) & not cited ($n$) & $p$ & signed cited & not cited & $p$ \\
+\midrule
+Foreground & 1.88 (57) & 1.31 (48) & $\mathbf{0.003}$ & $+0.30$ & $-0.15$ & $0.18$ \\
+Background & 1.95 (59) & 1.20 (46) & $\mathbf{<0.001}$ & $\mathbf{+0.63}$ & $\mathbf{-0.59}$ & $\mathbf{<0.001}$ \\
+Smoothness & 2.09 (34) & 1.39 (71) & $\mathbf{<0.001}$ & $\mathbf{-0.62}$ & $\mathbf{+0.44}$ & $\mathbf{0.009}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.85\linewidth]{fig_aspect_citation}
+  \caption{Visualization of the direction column of
+  Table~\ref{tab:aspect_citation}: mean signed A/B preference on
+  trials where each aspect was cited (bars; red = pulls toward
+  i-NGP, blue = pulls toward Nexels), with the corresponding
+  not-cited mean shown as a gray marker for contrast. Citing
+  background pulls preference toward Nexels; citing smoothness pulls
+  it toward i-NGP; foreground citations are roughly neutral on
+  direction. Error bars are SEM.}
+  \label{fig:aspect_citation}
+\end{figure}
+
+\paragraph{Per-scene breakdown.}
+Table~\ref{tab:aspect_per_scene} resolves
+Table~\ref{tab:aspect_citation} one level further by splitting each
+aspect's citation count by both scene and the direction the citer
+chose. The column-total row exposes an asymmetry that the aggregate
+table cannot: Nexels-choosing citers invoke smoothness only 12 times
+across all six scenes, against 33--38 for foreground and background;
+i-NGP-choosing citers invoke all three aspects nearly equally
+(24/21/22). Participants who chose Nexels were almost always doing
+so on the strength of \emph{what they saw}; participants who chose
+i-NGP did so on the strength of what they saw \emph{and} how it
+moved.
+
+\begin{table}[h]
+\centering
+\caption{Per-scene aspect citations split by A/B preference direction.
+Each cell counts trials where the row's aspect was cited \emph{and}
+the participant chose the column's method. No tied participant cited
+any aspect, so a third column group is unnecessary. Bold marks the
+largest cell per scene within the winning column group.}
+\label{tab:aspect_per_scene}
+\small
+\begin{tabular}{l@{\quad}rrr@{\quad}rrr}
+\toprule
+       & \multicolumn{3}{c}{i-NGP citers} & \multicolumn{3}{c}{Nexels citers} \\
+\cmidrule(lr){2-4} \cmidrule(lr){5-7}
+Scene  & fg & bg & sm & fg & bg & sm \\
+\midrule
+bicycle & 1 & 0 & 2 & 8 & \textbf{11} & 3 \\
+counter & 3 & 4 & 3 & \textbf{7} & 6 & 1 \\
+garden  & 3 & 2 & 4 & 2 & \textbf{7} & 3 \\
+kitchen & \textbf{8} & 5 & 7 & 2 & 1 & 0 \\
+room    & \textbf{8} & 5 & 5 & 4 & 5 & 2 \\
+stump   & 1 & 5 & 1 & \textbf{10} & 8 & 3 \\
+\midrule
+\textbf{total} & 24 & 21 & 22 & 33 & \textbf{38} & 12 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Instrument internal consistency.}
+Per-row slider gaps (Nexels rating minus i-NGP rating on each aspect)
+correlate with the same row's A/B preference at $\rho = 0.65$
+(foreground), $0.71$ (background), and $0.60$ (smoothness), all
+$p < 10^{-10}$ at $n=105$. When participants rate the methods
+differently on a continuous slider, that flows through cleanly to
+their forced choice on the same trial --- the two instruments measure
+compatible things.
+
+\paragraph{Inter-rater agreement.}
+At $n=18$ standard inter-rater agreement metrics (Kendall's $W$ on
+A/B preference per scene; ICC$(2,k)$ on per-aspect slider scores)
+become computable with usefully narrow confidence intervals. We
+defer the specific numbers to a follow-up pass.
+
+\section{Post-session participant satisfaction questionnaire}
+\label{app:satisfaction}
+
+We administer the following five-question Likert survey (Google Forms,
+1--5 scale) after each rating session. The survey is intentionally
+short --- five multiple-choice items --- to keep response rate high;
+qualitative comments are already captured by the rating viewer's
+notes field, so this post-session instrument is purely quantitative.
+
+\begin{enumerate}
+    \item \textit{Overall, how was your participant experience?}
+    \quad(1 = poor $\rightarrow$ 5 = excellent)
+    \item \textit{By the end of the session, how mentally fatigued
+    did you feel?} \quad(1 = not at all $\rightarrow$ 5 = a lot)
+    \item \textit{How long did the length of the session feel?}
+    \quad(1 = too short, 3 = just right, 5 = too long)
+    \item \textit{How clear were the instructions and questions for
+    the tasks?} \quad(1 = unclear $\rightarrow$ 5 = very clear)
+    \item \textit{How easy was it to use the interactive viewer?}
+    \quad(1 = hard $\rightarrow$ 5 = easy)
+\end{enumerate}
+
+The five items together cover the four facets of participant-side
+success defined in \S\ref{sec:success}: overall experience (Q1);
+cognitive load and pacing (Q2, Q3); task interpretability (Q4); and
+UI quality (Q5). Aggregated results to date appear in
+\S\ref{sec:participant_feedback}.

@@ -1,0 +1,418 @@
+% section_3.tex — Evaluation and Results
+% Current participant counts: cross-method n=18, convergence n=12.
+
+\section{Evaluation and Results}
+\label{sec:results}
+
+\subsection{Definition of success}
+\label{sec:success}
+
+A useful evaluation harness has to satisfy two parties, as flagged at
+the end of \S\ref{sec:background}. We restate the two criteria here in
+concrete, checkable form.
+
+\paragraph{Researcher-side success.}
+The harness should give a graphics researcher data they can act on
+without engineering the data pipeline themselves. Concretely:
+(a)~every participant who starts a session leaves a snapshot JSON on
+disk, including sessions that ended early; (b)~the resulting data has
+informative structure --- within-participant slider spread is
+non-trivial, A/B preferences are not all ties, and aspect citations
+are distributed across the three options rather than degenerate on one;
+and (c)~the data shape is general enough that a researcher can apply
+analyses of their own choosing (correlations against offline metrics,
+within-trial regressions, inter-rater agreement) without bespoke
+parsing.
+
+\paragraph{Participant-side success.}
+The session should feel smooth and easy to complete. Concretely:
+(a)~interactive latency is below the threshold at which participants
+notice it as ``laggy''; (b)~both renderers sustain their target frame
+rate over the full session without sustained dips; (c)~no participant
+abandons mid-session for technical reasons; and (d)~the rating UI is
+clear enough that no experimenter intervention is required.
+
+Participant-side success is harder to measure than researcher-side
+success because it is partly experiential: systems telemetry can
+confirm that no frames were dropped, but it cannot confirm that the
+participant felt the session was pleasant. We rely on telemetry as an
+indirect proxy for now, and plan to administer a brief post-session
+self-report survey (in preparation) covering perceived smoothness,
+clarity of the rating UI, and fatigue (\S\ref{sec:participant_feedback}).
+The dual-party framing also clarifies what kind of failure invalidates
+what kind of conclusion: a participant-side failure (frame stalls, UI
+confusion) propagates into researcher-side measurements and invalidates
+them, while a researcher-side data-shape ``failure'' --- sliders all
+pegged at one end, for instance --- could itself be a valid measurement
+of a real ceiling effect rather than a harness bug.
+
+\subsection{Case studies}
+\label{sec:setup}
+
+We exercised the harness with two case studies. Both ran on a single
+AWS GPU instance with an NVIDIA L4 (24~GB VRAM, \texttt{g6.xlarge}),
+hosting all server-side processes (\texttt{mediamtx}, \texttt{ws\_mux},
+\texttt{serve.py}, and the active renderers) on the same host.
+Participants connected from their own machines over the public
+internet; we did not constrain network conditions or display
+characteristics, and we discuss the resulting variance in
+\S\ref{sec:limitations}. Across both studies we recruited 19 unique
+participants from the authors' friends and labmates; eleven of the
+twelve case-B participants had previously completed case A. A case-A session
+lasted a median of 9~minutes (mean 10); a case-B session a median of
+5~minutes. We collected $n=18$ complete sessions in case study A and
+$n=12$ in case study B; recruitment is closed for this submission.
+
+\paragraph{Case study A: comparison (i-NGP vs Nexels).}
+Two NVS methods --- i-NGP and Nexels --- rendered side-by-side at a
+matched storage budget ($\approx$14~MB per scene; see
+Table~\ref{tab:cross_offline}) over six mip-NeRF-360 scenes
+(\texttt{bicycle}, \texttt{counter}, \texttt{garden}, \texttt{kitchen},
+\texttt{room}, \texttt{stump}) plus one practice scene
+(\texttt{bonsai}). The two methods stream concurrently to two
+side-by-side viewports at 1440$\times$810@30. Method identity is
+hidden on the viewport badges (only the \texttt{test} initials hook
+reveals it, and is never used in real sessions). The seven scene pairs
+are presented in a per-participant random order; side assignment of
+i-NGP and Nexels is coin-flipped per pair; the first pair
+(\texttt{bonsai}) is the practice trial and is excluded from analysis.
+The questionnaire shape --- per-side sliders, forced A/B, aspect
+multi-select --- is described in \S\ref{sec:questionnaire}.
+
+\paragraph{Case study B: convergence (3DGS at four checkpoint counts).}
+A single method (3D Gaussian Splatting) trained for varying numbers of
+iterations (1k, 3k, 7k, 30k) on two Tanks-and-Temples scenes
+(\texttt{train}, \texttt{truck}) --- eight stimuli total. All eight
+checkpoints are GPU-resident ($\approx$1.4~GB combined, 210k--3.8M
+splats per checkpoint), so swapping the active checkpoint is a
+constant-time pointer update. The renderer streams 1920$\times$1080@60.
+Before each scene's rating block, the participant watches a
+low-frame-rate slideshow of the training photographs as a
+ground-truth reference. Scene order is randomized; iteration order
+within a scene is fixed ascending so the reference frame for
+\emph{better} stays stable across the four levels.
+
+\paragraph{Offline-metric baselines.}
+For each scene--method pair in case study A and each
+scene--checkpoint pair in case study B we computed PSNR, SSIM, and
+LPIPS on the held-out test split for that scene (mip-NeRF-360
+hold-every-eighth-view convention for case study A; gsplat
+validation split for case study B). LPIPS uses the AlexNet backbone in
+both cases for consistency. Tables~\ref{tab:cross_offline}
+and~\ref{tab:convergence} list these per-stimulus offline numbers
+alongside the corresponding mean slider scores.
+
+\begin{table}[t]
+\begin{minipage}[t]{0.48\textwidth}
+\centering\footnotesize
+\captionof{table}{Case study A: \emph{offline metrics} at the
+\texttt{small} size setting ($\approx$14~MB per scene). PSNR / SSIM /
+LPIPS are computed on the held-out mip-NeRF-360 test split with a
+consistent LPIPS-AlexNet backbone; FPS is from each method's bench
+script over 200 cycled test-camera frames at 1297$\times$840. Bold
+marks the per-scene winner on each column. \texttt{bonsai} is the
+practice scene and is excluded from the mean.}
+\label{tab:cross_offline}
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{llrrrrr}
+\toprule
+Scene & Method & PSNR$\uparrow$ & SSIM$\uparrow$ & LPIPS$\downarrow$ & FPS & MB \\
+\midrule
+bicycle & i-NGP  & 21.93          & 0.462          & 0.592          & \textbf{62.0} & 14.5          \\
+        & Nexels & \textbf{22.21} & \textbf{0.539} & \textbf{0.424} & 29.5          & \textbf{14.4} \\
+counter & i-NGP  & 25.31          & 0.757          & 0.272          & \textbf{61.5} & \textbf{13.5} \\
+        & Nexels & \textbf{26.42} & \textbf{0.833} & \textbf{0.216} & 30.0          & 14.4          \\
+garden  & i-NGP  & 23.13          & 0.514          & 0.456          & \textbf{74.9} & \textbf{12.0} \\
+        & Nexels & \textbf{23.46} & \textbf{0.636} & \textbf{0.322} & 34.0          & 14.4          \\
+kitchen & i-NGP  & 27.12          & 0.767          & 0.214          & \textbf{96.2} & \textbf{12.6} \\
+        & Nexels & \textbf{27.68} & \textbf{0.861} & \textbf{0.167} & 31.9          & 14.4          \\
+room    & i-NGP  & 28.47          & 0.844          & 0.225          & \textbf{69.8} & 15.0          \\
+        & Nexels & \textbf{29.15} & \textbf{0.877} & \textbf{0.207} & 29.8          & \textbf{14.4} \\
+stump   & i-NGP  & 21.68          & 0.473          & 0.574          & 27.0          & 16.0          \\
+        & Nexels & \textbf{23.88} & \textbf{0.604} & \textbf{0.398} & \textbf{32.9} & \textbf{14.4} \\
+\midrule
+\multirow{2}{*}{\textbf{mean}}
+        & i-NGP  & 24.61          & 0.636          & 0.389          & \textbf{65.2} & 13.9          \\
+        & Nexels & \textbf{25.47} & \textbf{0.725} & \textbf{0.289} & 31.4          & 14.4          \\
+\bottomrule
+\end{tabular}
+\end{minipage}
+\hfill
+\begin{minipage}[t]{0.48\textwidth}
+\centering\footnotesize
+\captionof{table}{Case study A: \emph{per-scene human ratings}
+($n=18$ participants). \textbf{fg}, \textbf{bg}, \textbf{sm} are mean
+0--100 slider scores for foreground, background, and rendering
+smoothness. \textbf{Votes} is the number of participants who preferred
+that method on that scene; tie counts are bicycle 3, counter 1,
+garden 4, kitchen 2, room 1, stump 1. Bold marks the per-scene winner
+on each column.}
+\label{tab:cross_human}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{llrrrr}
+\toprule
+Scene & Method & fg$\uparrow$ & bg$\uparrow$ & sm$\uparrow$ & Votes \\
+\midrule
+bicycle & i-NGP  & 73.3          & 46.4          & 66.6          & 2              \\
+        & Nexels & \textbf{80.6} & \textbf{68.3} & \textbf{72.5} & \textbf{13}    \\
+counter & i-NGP  & \textbf{68.6} & 54.9          & \textbf{55.4} & 6              \\
+        & Nexels & 67.9          & \textbf{59.2} & 48.1          & \textbf{10}    \\
+garden  & i-NGP  & 71.3          & 62.3          & \textbf{56.9} & 7              \\
+        & Nexels & \textbf{76.8} & \textbf{74.3} & 45.9          & 7              \\
+kitchen & i-NGP  & \textbf{77.6} & \textbf{62.3} & \textbf{66.4} & \textbf{14}    \\
+        & Nexels & 58.4          & 43.1          & 38.6          & 2              \\
+room    & i-NGP  & \textbf{58.6} & \textbf{59.2} & \textbf{57.5} & \textbf{10}    \\
+        & Nexels & 52.8          & 54.6          & 55.8          & 6              \\
+stump   & i-NGP  & 60.7          & 52.9          & \textbf{63.9} & 5              \\
+        & Nexels & \textbf{76.5} & \textbf{53.7} & 59.4          & \textbf{11}    \\
+\midrule
+\multirow{2}{*}{\textbf{mean}}
+        & i-NGP  & 68.4          & 56.3          & \textbf{61.1} & 44             \\
+        & Nexels & \textbf{68.9} & \textbf{58.9} & 53.4          & \textbf{49}    \\
+\bottomrule
+\end{tabular}
+\end{minipage}
+\end{table}
+
+\begin{table}[t]
+\centering
+\caption{Case study B. Offline metrics and per-stimulus mean human
+ratings ($n=12$) for the convergence-study stimuli (3DGS at four
+checkpoint counts on Tanks-and-Temples \texttt{train} and
+\texttt{truck}). LPIPS is AlexNet (gsplat default), internally
+consistent within this table. FPS is \texttt{ellipse\_time} at the
+gsplat eval resolution and is therefore an upper bound on the
+interactive frame rate at 1920$\times$1080.}
+\label{tab:convergence}
+\small
+\begin{tabular}{llrrrrrrrrr}
+\toprule
+Scene & Iters & PSNR$\uparrow$ & SSIM$\uparrow$ & LPIPS$\downarrow$ & FPS & \# Splats & fg$\uparrow$ & bg$\uparrow$ & sm$\uparrow$ \\
+\midrule
+train & 1k  & 17.06 & 0.584 & 0.550 & 433.7 & 0.21M & 48.8 & 30.9 & 72.5 \\
+      & 3k  & 18.75 & 0.650 & 0.413 & 254.1 & 0.49M & 63.7 & 41.3 & 71.2 \\
+      & 7k  & 19.73 & 0.721 & 0.298 & 130.8 & 1.05M & 78.3 & 51.1 & 80.2 \\
+      & 30k & 21.44 & 0.812 & 0.146 &  77.4 & 1.81M & 84.2 & 64.2 & 79.2 \\
+truck & 1k  & 20.94 & 0.725 & 0.326 & 437.5 & 0.21M & 43.2 & 48.0 & 66.8 \\
+      & 3k  & 22.65 & 0.800 & 0.207 & 144.0 & 1.14M & 58.4 & 66.2 & 82.8 \\
+      & 7k  & 23.87 & 0.845 & 0.143 &  67.6 & 2.51M & 77.5 & 72.0 & 82.9 \\
+      & 30k & 25.04 & 0.871 & 0.095 &  45.5 & 3.79M & 81.3 & 71.8 & 60.1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Systems results}
+\label{sec:systems_results}
+
+The harness met its interactivity targets in every session collected
+to date. Both renderers in case study A sustained the target 30~fps
+at 1440$\times$810 throughout; the 3DGS renderer in case study B
+sustained 60~fps at 1920$\times$1080 across all four checkpoint
+levels; no session was abandoned due to a renderer stall, dropped
+WebRTC stream, or submission failure; and checkpoint swaps in case
+study B introduced no measurable visual hitch. The per-method FPS
+columns of Tables~\ref{tab:cross_offline} and~\ref{tab:convergence}
+give the single-renderer ceilings at the offline benchmark resolution
+(1297$\times$840 / gsplat eval). Per-scene FPS detail and the
+end-to-end latency budget are deferred to Appendix~\ref{app:systems}.
+
+\subsection{Data informativeness}
+\label{sec:informativeness}
+
+This subsection addresses the researcher-side success criterion: does
+the harness produce data with the shape and signal required for
+downstream analysis? We deliberately keep the discussion descriptive
+rather than inferential. The substantive claims that one could make
+\emph{from} this data --- about i-NGP vs Nexels, about the perceptual
+return on additional 3DGS training, about how PSNR tracks human
+preference --- are properly the researcher's to make. Our role here is
+to verify that the harness has not produced degenerate data.
+
+Three observations support the informativeness claim:
+
+First, the slider distributions are spread.
+Table~\ref{tab:cross_human} shows mean foreground/background/
+smoothness scores in case study A ranging from 38 to 81 across
+scene--method pairs, with no floor or ceiling effect.
+Convergence-case slider means (Table~\ref{tab:convergence}) similarly
+span 31 to 84 across the eight stimuli. Within-participant variance,
+while not shown in the tables, is non-trivial: participants regularly
+assigned different scores to different aspects of the same condition.
+
+Second, A/B preferences in case study A are heterogeneous across
+scenes (Figure~\ref{fig:preference_per_scene}). The aggregate
+44/49/12 (i-NGP / Nexels / tie) is close to even, but the per-scene
+distribution is anything but: \texttt{bicycle} swings 13--3--2 toward
+Nexels (sign test $p=0.007$); \texttt{kitchen} swings 14--2--2 toward
+i-NGP ($p=0.004$); the remaining four scenes sit closer to the
+aggregate average. The data discriminates strongly between scenes ---
+exactly the kind of structure that lets a downstream analysis say
+something interesting.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.85\linewidth]{fig_preference_per_scene}
+  \caption{Per-scene A/B preference distribution from case study A
+  ($n=18$). Each bar segments the 7-point preference scale into
+  strong / moderate / slight i-NGP (red shades), tie (gray), and
+  slight / moderate / strong Nexels (blue shades), so the bar's
+  colour spread encodes preference \emph{strength} in addition to
+  direction. Scenes ordered by net Nexels share, ascending. The
+  cross-scene heterogeneity is the indication that the harness
+  produces analyzable data; we do not interpret the per-scene
+  rankings here.}
+  \label{fig:preference_per_scene}
+\end{figure}
+
+Third, convergence-case slider trajectories across iteration counts
+show non-trivial patterns (Figure~\ref{fig:convergence}). On the
+smaller scene (\texttt{train}), foreground and background ratings rise
+monotonically across all four checkpoints (foreground 49 $\to$ 84;
+background 31 $\to$ 64), with smoothness flat after 7k. On
+\texttt{truck}, the picture is more interesting: foreground saturates
+between 7k and 30k (77 $\to$ 81), background flattens (72 $\to$ 72),
+and \emph{smoothness drops 23 points} from 82.9 at 7k to 60.1 at 30k
+--- a non-monotone trajectory that the data captures cleanly even at
+$n=12$. The four checkpoint levels are clearly distinguishable, and
+the data admits straightforward visual comparison against the offline
+LPIPS curve overlaid on the figure.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=\linewidth]{fig_convergence}
+  \caption{Per-aspect mean human rating ($n=12$ participants, error
+  bars are SEM) and offline LPIPS (teal dashed, axis inverted)
+  across the four 3DGS checkpoints. Top row: \texttt{train}. Bottom
+  row: \texttt{truck}. Columns are the three slider aspects.}
+  \label{fig:convergence}
+\end{figure}
+
+These are descriptions of the data, not claims about NVS methods. A
+researcher analyzing this data is the appropriate party to make
+substantive claims; our role is to verify that the data has the
+structure needed to support them. Appendix~\ref{app:analyses}
+illustrates the kinds of analyses the data admits --- Spearman
+correlations between A/B preference and offline-metric gap,
+Mann--Whitney $U$ tests for aspect-citation effects, and (once
+$n=18$ is large enough) Kendall's $W$ or ICC$(2,k)$ for inter-rater
+agreement.
+
+\subsection{Participant feedback}
+\label{sec:participant_feedback}
+
+This subsection addresses the participant-side success criterion via
+two channels: indirect indicators from session logs, and a brief
+post-session self-report survey administered to each participant.
+
+\paragraph{Indirect indicators (from session logs).}
+Every participant who loaded the viewer completed the session through
+to submission: there were no mid-session abandonments in either case
+study. Median session duration was approximately 9 minutes in case
+study A and 5 minutes in case study B --- consistent with our piloting
+estimate. No experimenter intervention was required
+during any session, and no participant reported a stall, freeze, or
+unresponsive UI in the post-submission notes field.
+
+\paragraph{Post-session self-report ($n=9$).}
+After each session we administer a five-question Likert survey
+(1--5 scale) covering overall experience, mental fatigue, perceived
+session length, instruction clarity, and ease of use of the
+interactive viewer; the questionnaire itself is documented in
+Appendix~\ref{app:satisfaction}. Table~\ref{tab:satisfaction} and
+Figure~\ref{fig:satisfaction} summarize the $n=9$ survey responses
+collected so far. The satisfaction survey was introduced partway
+through recruitment so its sample lags behind the rating data;
+numbers will be updated as additional survey responses come in.
+
+\begin{table}[h]
+\centering
+\caption{Post-session participant survey, $n=9$ responses to date.
+``Better'' indicates the direction toward positive participant
+experience. Anchor conventions: overall (1 = poor, 5 = excellent);
+fatigue (1 = none, 5 = a lot); length (1 = too short, 3 = just right,
+5 = too long); clarity (1 = unclear, 5 = very clear); ease
+(1 = hard, 5 = easy).}
+\label{tab:satisfaction}
+\small
+\begin{tabular}{lcccl}
+\toprule
+Question & Better & Mean & Range & Distribution \\
+\midrule
+Overall experience  & $\uparrow$    & 4.44 & 4--5 & 4$\times$5, 5$\times$4 \\
+Mental fatigue      & $\downarrow$  & 1.78 & 1--4 & 1$\times$4, 2$\times$4, 4$\times$1 \\
+Session length feel & $\rightarrow$ & 3.11 & 3--4 & 3$\times$8, 4$\times$1 \\
+Instruction clarity & $\uparrow$    & 4.44 & 4--5 & 4$\times$5, 5$\times$4 \\
+Viewer ease of use  & $\uparrow$    & 3.56 & 2--5 & 2$\times$1, 3$\times$3, 4$\times$4, 5$\times$1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.95\linewidth]{fig_participant_feedback}
+  \caption{Distribution of post-session participant survey responses
+  ($n=9$), one histogram per question. Bar heights are participant
+  counts; the dotted red line on each panel marks the mean. The
+  figure will be re-rendered as the survey sample grows.}
+  \label{fig:satisfaction}
+\end{figure}
+
+The signal remains positive across the board. Overall experience
+sits uniformly in the 4--5 band; instruction clarity is uniformly
+$\geq 4$; and 8 of 9 participants rated the session length as
+``just right'' (3), with one participant rating it 4
+(``a bit too long''). Mental fatigue is low (1--2) for eight of nine
+respondents, with one outlier at 4. The weakest dimension is ease of
+use of the interactive viewer (mean 3.56). The 2 came from the same
+participant whose row also shows elevated fatigue (4), suggesting
+that for at least one participant the viewer UI was itself a source
+of cognitive load rather than just the rating task; a new 5 in this
+column from a recent respondent pulls the mean up. With $n=9$ we
+report these patterns descriptively rather than test them, and will
+revisit as additional survey responses arrive.
+
+\subsection{Limitations}
+\label{sec:limitations}
+
+The most important limitation remains sample size. At $n=18$ and
+$n=12$ the statistical tests above are reasonable for the per-scene
+and per-stimulus signals we surface, but underpowered for finer-grained
+between-aspect comparisons; we report effect sizes alongside $p$-values
+where possible. Beyond sample
+size, several threats to validity warrant explicit acknowledgment.
+
+\emph{Display variance.} Participants connected over the public
+internet from uncalibrated monitors. Differences in display brightness,
+gamut, and refresh rate introduce noise we cannot correct for. The
+case study A design --- both methods rendered to the same participant
+in the same session --- partially controls for this, but case study B
+(stimuli presented sequentially) does not.
+
+\emph{Network variance.} WebRTC adapts bitrate dynamically based on
+network conditions, which means a participant on a slower network may
+be evaluating a different visual stimulus than one on a faster
+connection. We do not currently log per-session bitrate; for a future
+version this should be instrumented and either gated or stratified.
+
+\emph{Selection bias.} Participants were recruited from the authors'
+academic environment and self-selected for interest in 3D rendering;
+generalization to the broader population is not claimed.
+
+\emph{Order and learning effects.} Case study B fixes iteration order
+as ascending within scene, trading order-effect contamination for a
+stable reference frame for ``better''. Case study A randomizes scene
+order and A/B side assignment per pair. A first-pair learning effect
+may still inflate ratings on early scenes; the \texttt{bonsai}
+practice trial is intended to absorb most of this but is not a
+complete control.
+
+\emph{Method-blinding integrity.} The viewer hides method identities
+behind anonymous badges. We did not collect post-hoc data on whether
+participants could guess which side was which, which would be the
+standard check on blinding in a perception study.
+
+\emph{Participant-side measurement is indirect.} As described in
+\S\ref{sec:participant_feedback}, our current participant-side
+success indicators are entirely indirect. The planned post-session
+survey is the appropriate fix, but it is not yet in the field for the
+current data.

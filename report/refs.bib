@@ -1,0 +1,113 @@
+% refs.bib — CS348K final report
+% Cross-referenced from section_1.tex (and forward for sections 2-3).
+% Many entries verified against the canonical source; a few (instant-NGP, 3DGS, gsplat)
+% are accurate on authors/title/year/venue, but page/article-number fields are best-effort.
+% Double-check before final submission against the venue's official record.
+
+% ===== Image quality / perceptual metrics =====
+
+@article{wang2004ssim,
+  title   = {Image Quality Assessment: From Error Visibility to Structural Similarity},
+  author  = {Wang, Zhou and Bovik, Alan C. and Sheikh, Hamid R. and Simoncelli, Eero P.},
+  journal = {IEEE Transactions on Image Processing},
+  volume  = {13},
+  number  = {4},
+  pages   = {600--612},
+  year    = {2004},
+}
+
+@inproceedings{wang2003msssim,
+  title     = {Multiscale Structural Similarity for Image Quality Assessment},
+  author    = {Wang, Zhou and Simoncelli, Eero P. and Bovik, Alan C.},
+  booktitle = {Asilomar Conference on Signals, Systems \& Computers},
+  pages     = {1398--1402},
+  year      = {2003},
+}
+
+@article{wang2009mse,
+  title   = {Mean Squared Error: Love It or Leave It? {A} New Look at Signal Fidelity Measures},
+  author  = {Wang, Zhou and Bovik, Alan C.},
+  journal = {IEEE Signal Processing Magazine},
+  volume  = {26},
+  number  = {1},
+  pages   = {98--117},
+  year    = {2009},
+}
+
+@inproceedings{zhang2018lpips,
+  title     = {The Unreasonable Effectiveness of Deep Features as a Perceptual Metric},
+  author    = {Zhang, Richard and Isola, Phillip and Efros, Alexei A. and Shechtman, Eli and Wang, Oliver},
+  booktitle = {Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2018},
+}
+
+% ===== Novel-view-synthesis methods =====
+
+@inproceedings{mildenhall2020nerf,
+  title     = {{NeRF}: Representing Scenes as Neural Radiance Fields for View Synthesis},
+  author    = {Mildenhall, Ben and Srinivasan, Pratul P. and Tancik, Matthew and Barron, Jonathan T. and Ramamoorthi, Ravi and Ng, Ren},
+  booktitle = {European Conference on Computer Vision (ECCV)},
+  year      = {2020},
+}
+
+@article{mueller2022instantngp,
+  title   = {Instant Neural Graphics Primitives with a Multiresolution Hash Encoding},
+  author  = {M{\"u}ller, Thomas and Evans, Alex and Schied, Christoph and Keller, Alexander},
+  journal = {ACM Transactions on Graphics (SIGGRAPH)},
+  volume  = {41},
+  number  = {4},
+  year    = {2022},
+}
+
+@article{kerbl20233dgs,
+  title   = {{3D} {G}aussian Splatting for Real-Time Radiance Field Rendering},
+  author  = {Kerbl, Bernhard and Kopanas, Georgios and Leimk{\"u}hler, Thomas and Drettakis, George},
+  journal = {ACM Transactions on Graphics (SIGGRAPH)},
+  volume  = {42},
+  number  = {4},
+  year    = {2023},
+}
+
+@article{tewari2022nrsurvey,
+  title   = {Advances in Neural Rendering},
+  author  = {Tewari, Ayush and Thies, Justus and Mildenhall, Ben and Srinivasan, Pratul and Tretschk, Edgar and Yifan, Wang and Lassner, Christoph and Sitzmann, Vincent and Martin-Brualla, Ricardo and Lombardi, Stephen and Simon, Tomas and Theobalt, Christian and Nie{\ss}ner, Matthias and Barron, Jonathan T. and Wetzstein, Gordon and Zollh{\"o}fer, Michael and Golyanik, Vladislav},
+  journal = {Computer Graphics Forum (Eurographics State of the Art Report)},
+  volume  = {41},
+  number  = {2},
+  year    = {2022},
+}
+
+% ===== Datasets =====
+
+@inproceedings{barron2022mipnerf360,
+  title     = {Mip-{NeRF} 360: Unbounded Anti-Aliased Neural Radiance Fields},
+  author    = {Barron, Jonathan T. and Mildenhall, Ben and Verbin, Dor and Srinivasan, Pratul P. and Hedman, Peter},
+  booktitle = {Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
+  year      = {2022},
+}
+
+@article{knapitsch2017tanks,
+  title   = {Tanks and Temples: Benchmarking Large-Scale Scene Reconstruction},
+  author  = {Knapitsch, Arno and Park, Jaesik and Zhou, Qian-Yi and Koltun, Vladlen},
+  journal = {ACM Transactions on Graphics},
+  volume  = {36},
+  number  = {4},
+  year    = {2017},
+}
+
+% ===== Software / implementation =====
+
+@article{ye2024gsplat,
+  title   = {gsplat: An Open-Source Library for {G}aussian Splatting},
+  author  = {Ye, Vickie and Li, Ruilong and Kerr, Justin and Turkulainen, Matias and Yi, Brent and Pan, Letian and Seiskari, Otto and Ye, Jianbo and Hu, Jeffrey and Tancik, Matthew and Kanazawa, Angjoo},
+  journal = {arXiv preprint arXiv:2409.06765},
+  year    = {2024},
+}
+
+@article{nexels,
+  title   = {Nexels: Neurally-textured surfels for real-time novel view synthesis with sparse geometries},
+  author  = {Rong, Victor and Held, Jan and Chu, Victor and Rebain, Daniel and
+             Van Droogenbroeck, Marc and Kutulakos, Kiriakos N. and Tagliasacchi, Andrea and Lindell, David B.},
+  journal = {arXiv preprint arXiv:2512.13796},
+  year    = {2025},
+}

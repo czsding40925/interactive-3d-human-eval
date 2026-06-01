@@ -1,0 +1,155 @@
+% section_1.tex — Background and Setup
+
+\section{Background and Setup}
+\label{sec:background}
+
+Novel View Synthesis (NVS) is an active area of research in 3D computer
+graphics. The goal is to reconstruct a 3D representation of a scene from
+a sparse collection of photographs taken from multiple camera angles.
+Optimization-based approaches that fit either differentiable neural
+fields~\citep{mildenhall2020nerf,mueller2022instantngp} or Gaussian
+primitives~\citep{kerbl20233dgs} have advanced the field substantially
+in both rendering quality and inference speed; we refer readers
+to~\citet{tewari2022nrsurvey} for a comprehensive survey.
+
+For any 3D rendering method, defining ``good quality'' is open-ended:
+the final product is a visual artifact intended to be perceived by human
+eyes. The literature predominantly relies on image-based metrics --- PSNR,
+MS-SSIM, and LPIPS~\citep{zhang2018lpips} --- which measure the
+difference between ground-truth photographs held out from training and
+reconstructed images rendered from those held-out cameras. As numerical
+distances from ground truth these metrics are informative, but in the
+context of 3D rendering they have two important limitations:
+\begin{enumerate}
+    \item The image-quality-assessment literature has argued for two
+    decades that good PSNR or MS-SSIM scores do not necessarily translate
+    to a good perceptual experience~\citep{wang2009mse}. LPIPS partially
+    addresses this by replacing pixel-level comparisons with learned deep
+    features, but it remains a proxy for direct viewing and is
+    comparatively expensive to compute.
+    \item Image-based metrics evaluate \emph{static} images at a small,
+    fixed set of held-out camera poses, whereas practitioners and end
+    users actually \emph{interact} with 3D scenes --- moving the camera,
+    zooming, and viewing continuously from arbitrary angles. Free
+    navigation introduces failure modes (popping, floater drift,
+    smoothness artifacts at oblique angles) that no static-image metric
+    can detect.
+\end{enumerate}
+
+To address this gap, we develop an interactive streaming harness for
+human evaluation of real-time 3D renderers. The system is a prototype,
+but it embodies a specific philosophy: the quality of a 3D rendering
+algorithm should ultimately be measured by how participants perceive it
+while interactively viewing it. A researcher provides one or two
+renderers together with a study configuration; the system streams those
+renderers to participants' browsers, collects per-aspect quality ratings
+(and, in two-method studies, an overall A/B preference together with
+aspect citations), and returns the raw per-participant data for the
+researcher to analyze.
+
+The system's inputs are a researcher-provided rendering algorithm and
+its fitted 3D model, together with a study configuration (scenes,
+conditions, protocol). Its outputs are the data collected from each
+participant's session: (a)~\emph{subject ratings} produced through the
+rating UI --- per-aspect 0--100 sliders, A/B preferences, and aspect
+citations; (b)~\emph{free-text feedback} entered in the post-session
+notes field; and (c)~\emph{mouse-movement trajectories} logged over
+the participant's viewing window. The first two are the immediate
+data products of the rating task; the third lets a researcher
+reconstruct \emph{which views} of the scene each participant chose to
+inspect before issuing a rating. Figure~\ref{fig:io} gives a
+high-level view of how the system sits between the researcher and the
+participant.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{io_diagram}
+  \caption{Conceptual view of system inputs and outputs. The researcher
+  provides a rendering algorithm and a fitted 3D model; the system
+  streams the resulting renderings to a participant's browser-based
+  viewer and collects three categories of response data --- subject
+  ratings, free-text feedback, and mouse-movement trajectories ---
+  for the researcher to analyze.}
+  \label{fig:io}
+\end{figure}
+
+The three \textit{main goals} are:
+\begin{enumerate}
+    \item Measure a dimension of rendering quality that image-based
+    metrics on held-out static frames cannot capture: the participant's
+    \emph{interactive perceptual experience} under continuous,
+    free-roaming viewing. The collected data is intended as citable
+    evidence a researcher can use to support claims about how their
+    method actually behaves in interactive use, complementing rather
+    than competing with the offline numbers already reported in the
+    literature.
+    \item Offer a plug-and-play framework where a researcher can connect
+    their renderer and trained model and run a human study with minimal
+    infrastructure work.
+    \item Support both single-method subjective studies and two-method
+    comparison studies, covering the two most common shapes of perceptual
+    question a 3D-graphics researcher might ask.
+\end{enumerate}
+The three explicit \textit{non-goals} are:
+\begin{enumerate}
+    \item Replace image-based numerical metrics --- those metrics are
+    cheap to compute, can be used as training losses, and remain the
+    right tool for in-the-loop comparisons during method development.
+    \item Modify the underlying rendering algorithms --- we provide a
+    platform for evaluation, not for method improvement.
+    \item Provide statistical analysis or visualization of the
+    collected data --- the harness delivers raw per-participant
+    response data; how that data is summarized, correlated against
+    offline metrics, or visualized is the researcher's call.
+\end{enumerate}
+Two practical \textit{constraints} shape the system's design:
+\begin{enumerate}
+    \item \textit{Participants evaluate from their own machines},
+    which we cannot assume to have GPUs capable of running an NVS
+    renderer. The renderer must therefore run on a remote
+    GPU-equipped instance, with the rendered output delivered to the
+    participant's browser over the network. We host the active
+    renderer(s) and supporting services on an AWS L4 GPU instance.
+    \item \textit{The framework should be agnostic to the underlying
+    rendering algorithm.} Different NVS methods use different
+    rendering stacks --- CUDA-accelerated hash grids for i-NGP, a
+    custom rasterizer for Nexels, the \texttt{gsplat} differentiable
+    rasterizer for 3DGS --- and we want to support not just these
+    three but whatever NVS method a future researcher brings. A
+    framework that asked each renderer to ship its native output
+    format to the browser would have to keep pace with every method's
+    evolving toolchain. Streaming a common video format (H.264)
+    abstracts that diversity away: every renderer emits the same
+    output regardless of its internal representation.
+\end{enumerate}
+These constraints together motivate the streaming architecture
+described in Section~\ref{sec:approach}.
+
+To exercise the harness, we run two case studies of the kind a graphics
+researcher might reach for when validating their own model. The first is
+a single-viewpoint study --- participants view one rendering at a time
+and rate it. The second is a two-viewpoint study --- participants compare
+two NVS models side by side and select an overall preference along with
+the aspects that drove that choice. The focus is on the system rather
+than the findings of either case study; provided the resulting data are
+coherent and non-degenerate, the harness has done its job.
+
+A good evaluation harness must satisfy two parties. On the researcher
+side, it should run on the GPUs and trained models a graphics researcher
+already has, and return interpretable, meaningful data without bespoke
+infrastructure work. On the participant side, each session should feel
+smooth and bug-free, with imperceptible streaming latency and a clear
+rating interface. We make both criteria precise in
+Section~\ref{sec:results}. The crux is twofold, and the methodological
+half is the larger contribution. \emph{Methodologically}, we have to
+design a questionnaire and a study protocol that meaningfully capture
+interactive perceptual experience --- a design problem with no
+off-the-shelf answer in the 3D-rendering literature, where every
+existing instrument either reduces to an image-metric proxy or asks the
+participant to rate a static frame. \emph{Infrastructurally}, we have
+to deliver real-time renderings of multiple high-end NVS methods to a
+remote browser at participant-imperceptible latency, on a single L4
+GPU, with a renderer interface generic enough that adding a new method
+does not require modifying the study logic.
+Section~\ref{sec:approach} describes both;
+Section~\ref{sec:results} reports the two case studies.
