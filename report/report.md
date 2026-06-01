@@ -2,10 +2,10 @@
 
 *CS348K Spring 2026 Final Report*
 
-**Connor Ding** (czsding@stanford.edu) · **Ishita Gupta**
+**Connor Ding** (czsding@stanford.edu) · **Ishita Gupta** (ishitagupta@stanford.edu)
 Stanford University
 
-📄 [Full LaTeX report (PDF)](main.pdf) — formal version with all appendices,
+📄 [Full LaTeX report (PDF)](CS348K_Final_Report.pdf) — formal version with all appendices,
 statistical tests, and limitations.
 
 ---
@@ -172,7 +172,7 @@ background**. The headline:
 
 ### Result 4 — the data is informative, but not yet conclusive
 
-**What our system supports** (and we surface in [`main.pdf`](main.pdf)
+**What our system supports** (and we surface in [`CS348K_Final_Report.pdf`](CS348K_Final_Report.pdf)
 Appendix B):
 - Foreground / background / smoothness rating analysis
 - Aspect-citation analysis (Mann–Whitney *U* on cited-vs-not effects)
@@ -233,7 +233,7 @@ substantive claims — that PSNR is uninformative for interactive
 preference, that FPS is the strongest single predictor, that 3DGS
 overshoots `truck` at 30k — are properly the researcher's to make from
 the data we deliver; the system's contribution is making them
-*measurable*. See [`main.pdf`](main.pdf) §3.4 and Appendix B for the
+*measurable*. See [`CS348K_Final_Report.pdf`](CS348K_Final_Report.pdf) §3.4 and Appendix B for the
 formal analyses.
 
 ## 12. Limitations
@@ -241,7 +241,7 @@ formal analyses.
 The most important limitation is sample size (n=18 cross-method, n=12
 convergence). Additional threats to validity — display variance, network
 variance, selection bias, order effects, blinding integrity — are
-detailed in [`main.pdf`](main.pdf) §3.6.
+detailed in [`CS348K_Final_Report.pdf`](CS348K_Final_Report.pdf) §3.6.
 
 ## 13. Future work
 
@@ -250,7 +250,7 @@ detailed in [`main.pdf`](main.pdf) §3.6.
 - Mouse-trajectory replay analysis: would a participant's rating have
   been the same had they only seen the held-out test camera?
 - Additional rendering methods plugged into the same harness via the
-  contract documented in [`main.pdf`](main.pdf) §2.2
+  contract documented in [`CS348K_Final_Report.pdf`](CS348K_Final_Report.pdf) §2.2
 - Generalization to non-NVS rendering domains (e.g., real-time
   game-engine quality settings)
 

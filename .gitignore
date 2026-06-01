@@ -40,6 +40,8 @@ method_metrics/
 *.fls
 *.synctex.gz
 *.toc
+# local-build PDF; the deliverable is CS348K_Final_Report.pdf
+report/main.pdf
 
 # Participant data — contains initials/timestamps, keep private
 *_ratings.csv

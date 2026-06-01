@@ -19,7 +19,7 @@ For motivation, system design, case-study results, participant feedback,
 and limitations, see the full report in [`report/`](report/):
 
 - 📑 **[`report/report.md`](report/report.md)** — narrative writeup (markdown)
-- 📄 **[`report/main.pdf`](report/main.pdf)** — formal LaTeX version with all appendices
+- 📄 **[`report/CS348K_Final_Report.pdf`](report/CS348K_Final_Report.pdf)** — formal LaTeX version with all appendices
 
 The rest of this README covers what the framework collects, the two case
 studies at a glance, and how to run the pipeline yourself.
@@ -164,5 +164,5 @@ interactive-3d-human-eval/
   assets/                          architecture diagram, result figures, demo GIF
   report/
     report.md                      narrative writeup (this is the project page)
-    main.pdf                       full LaTeX report with appendices
+    CS348K_Final_Report.pdf                       full LaTeX report with appendices
 ```
