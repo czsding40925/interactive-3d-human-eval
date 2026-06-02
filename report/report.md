@@ -34,8 +34,6 @@ and form an opinion based on the views *they* chose to inspect. Free
 navigation introduces failure modes — popping, floater drift, smoothness
 artifacts at oblique angles — that no static-image metric can detect.
 
-![Live rating demo](../assets/viewer_demo.gif)
-
 ## 4. So why don't NVS papers report perceptual metrics?
 
 Two reasons:
@@ -123,6 +121,8 @@ Given a ≈14 MB storage budget per scene, we compared two NVS methods:
 Six mip-NeRF-360 scenes (`bicycle / counter / garden / kitchen / room /
 stump`), `bonsai` as a practice pair. Two viewports rendered concurrently
 and independently orbited by the participant.
+
+![Comparison study session](../assets/cross_method_demo.gif)
 
 **Hypothesis:** Nexels has better static-image metrics → Nexels will
 provide a better interactive perceptual experience.

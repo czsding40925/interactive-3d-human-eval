@@ -4,7 +4,7 @@ A web-based, interactive human-eval pipeline for comparing 3D rendering
 methods under live novel-view synthesis. Two self-contained case studies
 ship with the repo, each with its own backend launcher and viewer page.
 
-![Live rating demo](assets/viewer_demo.gif)
+![Live rating demo — comparison study](assets/cross_method_demo.gif)
 
 The harness is renderer-agnostic: any process that consumes camera-pose
 deltas on a WebSocket and pushes H.264 over RTSP can plug in.
