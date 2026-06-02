@@ -194,6 +194,8 @@ iterations (1k / 3k / 7k / 30k) on two Tanks-and-Temples scenes (`train`,
 checkpoint swaps are constant-time. Per-scene reference photo slideshow
 plays once before each scene's rating block.
 
+![Convergence study session (sped up 1.5×)](../assets/convergence_demo.gif)
+
 ![Convergence ratings vs offline LPIPS](../assets/fig_convergence.png)
 
 `train` improves monotonically on all three aspects from 1k → 30k. But
