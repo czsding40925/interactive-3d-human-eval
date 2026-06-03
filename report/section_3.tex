@@ -7,44 +7,51 @@
 \subsection{Definition of success}
 \label{sec:success}
 
-A useful evaluation harness has to satisfy two parties, as flagged at
-the end of \S\ref{sec:background}. We restate the two criteria here in
-concrete, checkable form.
+As flagged in \S\ref{sec:background}, the harness must succeed on three
+axes: the system has to work, the data has to be informative, and the
+session has to be tolerable. We restate each in concrete, checkable form.
+
+\paragraph{System-side success.}
+The streaming pipeline must work end-to-end for diverse NVS methods.
+Concretely: (a)~all three target renderer types --- i-NGP (CUDA hash
+grids), Nexels (custom surfel rasterizer), and 3DGS (\texttt{gsplat})
+--- integrate through the same renderer contract without touching the
+viewer or the study logic; (b)~both renderers in the comparison case
+study sustain the target 30\,fps at 1440$\times$810 throughout the
+session; (c)~the 3DGS renderer in the convergence case study sustains
+60\,fps at 1920$\times$1080 across all four checkpoint levels; and
+(d)~no session is abandoned due to a streaming-side failure
+(renderer stall, dropped WebRTC stream, submission write error).
 
 \paragraph{Researcher-side success.}
-The harness should give a graphics researcher data they can act on
-without engineering the data pipeline themselves. Concretely:
-(a)~every participant who starts a session leaves a snapshot JSON on
-disk, including sessions that ended early; (b)~the resulting data has
-informative structure --- within-participant slider spread is
-non-trivial, A/B preferences are not all ties, and aspect citations
-are distributed across the three options rather than degenerate on one;
-and (c)~the data shape is general enough that a researcher can apply
+The harness should hand the researcher data they can act on without
+engineering the data pipeline themselves. Concretely: (a)~every
+participant who starts a session leaves a snapshot JSON on disk,
+including early-exit sessions; (b)~the data has informative structure
+--- non-trivial within-participant slider spread, A/B preferences not
+all ties, aspect citations distributed across the three options; and
+(c)~the data shape is general enough that a researcher can apply
 analyses of their own choosing (correlations against offline metrics,
 within-trial regressions, inter-rater agreement) without bespoke
 parsing.
 
 \paragraph{Participant-side success.}
 The session should feel smooth and easy to complete. Concretely:
-(a)~interactive latency is below the threshold at which participants
-notice it as ``laggy''; (b)~both renderers sustain their target frame
-rate over the full session without sustained dips; (c)~no participant
-abandons mid-session for technical reasons; and (d)~the rating UI is
-clear enough that no experimenter intervention is required.
+(a)~interactive latency is imperceptible; (b)~no participant abandons
+mid-session for technical reasons; and (c)~the rating UI is clear
+enough that no experimenter intervention is required.
 
-Participant-side success is harder to measure than researcher-side
-success because it is partly experiential: systems telemetry can
-confirm that no frames were dropped, but it cannot confirm that the
-participant felt the session was pleasant. We rely on telemetry as an
-indirect proxy for now, and plan to administer a brief post-session
-self-report survey (in preparation) covering perceived smoothness,
-clarity of the rating UI, and fatigue (\S\ref{sec:participant_feedback}).
-The dual-party framing also clarifies what kind of failure invalidates
-what kind of conclusion: a participant-side failure (frame stalls, UI
-confusion) propagates into researcher-side measurements and invalidates
-them, while a researcher-side data-shape ``failure'' --- sliders all
-pegged at one end, for instance --- could itself be a valid measurement
-of a real ceiling effect rather than a harness bug.
+Participant-side success is the hardest of the three to measure:
+telemetry can show no frames were dropped, but it cannot show that the
+participant felt the session was pleasant. We use telemetry as an
+indirect proxy and a brief post-session self-report survey
+(\S\ref{sec:participant_feedback}) as the direct instrument. The
+three-axis framing also clarifies failure modes: a system-side or
+participant-side failure (frame stalls, UI confusion) propagates into
+researcher-side measurements and invalidates them; a researcher-side
+data-shape ``failure'' --- sliders all pegged at one end, for instance
+--- could itself be a valid measurement of a real ceiling effect rather
+than a harness bug.
 
 \subsection{Case studies}
 \label{sec:setup}
@@ -201,20 +208,24 @@ truck & 1k  & 20.94 & 0.725 & 0.326 & 437.5 & 0.21M & 43.2 & 48.0 & 66.8 \\
 \end{tabular}
 \end{table}
 
-\subsection{Systems results}
+\subsection{System-side results}
 \label{sec:systems_results}
 
-The harness met its interactivity targets in every session collected
-to date. Both renderers in case study A sustained the target 30~fps
-at 1440$\times$810 throughout; the 3DGS renderer in case study B
-sustained 60~fps at 1920$\times$1080 across all four checkpoint
-levels; no session was abandoned due to a renderer stall, dropped
-WebRTC stream, or submission failure; and checkpoint swaps in case
-study B introduced no measurable visual hitch. The per-method FPS
-columns of Tables~\ref{tab:cross_offline} and~\ref{tab:convergence}
-give the single-renderer ceilings at the offline benchmark resolution
-(1297$\times$840 / gsplat eval). Per-scene FPS detail and the
-end-to-end latency budget are deferred to Appendix~\ref{app:systems}.
+All four system-side criteria in \S\ref{sec:success} are met. The
+three target renderer types (i-NGP, Nexels, 3DGS) each integrated
+through the renderer contract with only a per-method wrapper script
+and one route registration in \texttt{ws\_mux.py}, leaving the viewer
+and study logic untouched. Both renderers in case study A sustained
+the target 30~fps at 1440$\times$810 throughout every session; the
+3DGS renderer in case study B sustained 60~fps at 1920$\times$1080
+across all four checkpoint levels; checkpoint swaps introduced no
+measurable visual hitch; and no session was abandoned due to a
+renderer stall, dropped WebRTC stream, or submission failure. The
+per-method FPS columns of Tables~\ref{tab:cross_offline}
+and~\ref{tab:convergence} give the single-renderer ceilings at the
+offline benchmark resolution (1297$\times$840 / gsplat eval).
+Per-scene FPS detail and the end-to-end latency budget are deferred
+to Appendix~\ref{app:systems}.
 
 \subsection{Data informativeness}
 \label{sec:informativeness}
@@ -318,58 +329,47 @@ After each session we administer a five-question Likert survey
 (1--5 scale) covering overall experience, mental fatigue, perceived
 session length, instruction clarity, and ease of use of the
 interactive viewer; the questionnaire itself is documented in
-Appendix~\ref{app:satisfaction}. Table~\ref{tab:satisfaction} and
-Figure~\ref{fig:satisfaction} summarize the $n=9$ survey responses
-collected so far. The satisfaction survey was introduced partway
-through recruitment so its sample lags behind the rating data;
-numbers will be updated as additional survey responses come in.
-
-\begin{table}[h]
-\centering
-\caption{Post-session participant survey, $n=9$ responses to date.
-``Better'' indicates the direction toward positive participant
-experience. Anchor conventions: overall (1 = poor, 5 = excellent);
-fatigue (1 = none, 5 = a lot); length (1 = too short, 3 = just right,
-5 = too long); clarity (1 = unclear, 5 = very clear); ease
-(1 = hard, 5 = easy).}
-\label{tab:satisfaction}
-\small
-\begin{tabular}{lcccl}
-\toprule
-Question & Better & Mean & Range & Distribution \\
-\midrule
-Overall experience  & $\uparrow$    & 4.44 & 4--5 & 4$\times$5, 5$\times$4 \\
-Mental fatigue      & $\downarrow$  & 1.78 & 1--4 & 1$\times$4, 2$\times$4, 4$\times$1 \\
-Session length feel & $\rightarrow$ & 3.11 & 3--4 & 3$\times$8, 4$\times$1 \\
-Instruction clarity & $\uparrow$    & 4.44 & 4--5 & 4$\times$5, 5$\times$4 \\
-Viewer ease of use  & $\uparrow$    & 3.56 & 2--5 & 2$\times$1, 3$\times$3, 4$\times$4, 5$\times$1 \\
-\bottomrule
-\end{tabular}
-\end{table}
+Appendix~\ref{app:satisfaction}. Figure~\ref{fig:satisfaction}
+shows the response distribution for each question. The satisfaction
+survey was introduced partway through recruitment so its sample
+($n=9$) lags behind the rating data; numbers will be updated as
+additional survey responses come in.
 
 \begin{figure}[h]
   \centering
-  \includegraphics[width=0.95\linewidth]{fig_participant_feedback}
+  \includegraphics[width=0.97\linewidth]{fig_participant_feedback}
   \caption{Distribution of post-session participant survey responses
   ($n=9$), one histogram per question. Bar heights are participant
-  counts; the dotted red line on each panel marks the mean. The
-  figure will be re-rendered as the survey sample grows.}
+  counts; the dotted red line on each panel marks the mean. Anchor
+  conventions: overall (1 = poor, 5 = excellent); fatigue (1 = none,
+  5 = a lot); length (1 = too short, 3 = just right, 5 = too long);
+  clarity (1 = unclear, 5 = very clear); ease (1 = hard, 5 = easy).}
   \label{fig:satisfaction}
 \end{figure}
 
-The signal remains positive across the board. Overall experience
-sits uniformly in the 4--5 band; instruction clarity is uniformly
-$\geq 4$; and 8 of 9 participants rated the session length as
-``just right'' (3), with one participant rating it 4
-(``a bit too long''). Mental fatigue is low (1--2) for eight of nine
+The signal is positive across the board. Overall experience and
+instruction clarity both sit at mean 4.4 on the 5-point scale, with
+all responses $\geq 4$ on both. Eight of nine participants rated
+session length as ``just right'' (3); the ninth rated it 4 (``a bit
+too long''). Mental fatigue is low (1--2) for eight of nine
 respondents, with one outlier at 4. The weakest dimension is ease of
-use of the interactive viewer (mean 3.56). The 2 came from the same
-participant whose row also shows elevated fatigue (4), suggesting
-that for at least one participant the viewer UI was itself a source
-of cognitive load rather than just the rating task; a new 5 in this
-column from a recent respondent pulls the mean up. With $n=9$ we
-report these patterns descriptively rather than test them, and will
-revisit as additional survey responses arrive.
+use of the interactive viewer (mean 3.56) --- the 2 came from the same
+participant whose row also shows elevated fatigue (4), suggesting that
+for at least one participant the viewer UI was itself a source of
+cognitive load rather than just the rating task. With $n=9$ we report
+these patterns descriptively rather than test them.
+
+\paragraph{Free-response feedback.}
+After each session participants could leave optional free-text
+comments. Reading across them, participants reported overall positive
+experience --- \emph{``really impressed by the different spaces it
+could capture''} $\cdot$ \emph{``VERY CLEAR INSTRUCTIONS!''} $\cdot$
+\emph{``really liked this one --- clear how much better things were
+improving over time''} --- with common suggestions for improvement
+including a reset-view button, less-sensitive camera zoom, and
+consistent camera-drag direction. These align with the lower viewer
+ease-of-use rating in the survey and are concrete UI affordances we
+would prioritise in a follow-on iteration of the system.
 
 \subsection{Limitations}
 \label{sec:limitations}

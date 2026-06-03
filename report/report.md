@@ -96,18 +96,26 @@ WebSocket, H.264 over RTSP out, optional `swap_state` to flip the active
 model in place. Adding a new method is a few-line configuration change in
 `ws_mux.py` and `mediamtx.yml`; the browser stays renderer-agnostic.
 
-## 7. Evaluating the evaluator — two success criteria
+## 7. Evaluating the evaluator — three success criteria
+
+⚙️ **System side:** did the streaming pipeline work for diverse NVS
+methods? Concretely: all three target renderers (i-NGP, Nexels, 3DGS)
+integrated through the same contract without touching the viewer or
+study logic; the comparison renderers sustained 30 fps at 1440×810
+throughout; the convergence renderer sustained 60 fps at 1920×1080
+across all four checkpoints; no session was abandoned due to a
+streaming-side failure.
 
 🔬 **Researcher side:** does the data answer the researcher's question?
-Concretely: every session leaves a snapshot JSON; the resulting data has
+Concretely: every session leaves a snapshot JSON; the data has
 informative structure (within-participant slider spread, non-degenerate
 A/B distributions, distributed aspect citations); the data shape is
-general enough to apply any analysis the researcher prefers.
+general enough for whatever analysis the researcher prefers.
 
 👤 **Participant side:** was the session smooth, clear, easy to use?
-Concretely: interactive latency is imperceptible; renderers sustain
-their target FPS; no participant abandons mid-session; the rating UI
-needs no experimenter intervention.
+Concretely: interactive latency was imperceptible; no participant
+abandoned mid-session; the rating UI needed no experimenter
+intervention.
 
 ## 8. Case study A — i-NGP vs Nexels at matched storage
 

@@ -144,20 +144,13 @@ third method is a few lines of configuration rather than a viewer
 rewrite.
 
 \paragraph{What did not work.}
-Two earlier designs are preserved in \texttt{archive/}. We initially
-considered a fully pre-rendered evaluation built on canned camera
-trajectories rendered to MP4
-(\texttt{archive/start\_noninteractive.sh}), but pilot sessions
-surfaced exactly the central limitation that motivated the streaming
-approach: participants could not probe the artifacts they wanted to
-talk about. We then tried a single-renderer interactive pipeline built
-on Xvfb plus each renderer's native UI, with \texttt{event\_relay.py}
-translating browser WebSocket events into \texttt{xdotool} keystrokes
-(\texttt{archive/start\_interactive.sh}). This worked end-to-end but
-end-to-end latency was high (the screen-capture path added tens of
-milliseconds), and the design did not generalize to running two
-renderers concurrently for a side-by-side comparison because each one
-demanded its own X display. The current architecture --- renderers
-that push H.264 directly to mediamtx, browser receives via WebRTC,
-event mux that routes per-method WebSockets --- replaced both of these
-and is substantially simpler.
+Two earlier designs are preserved in \texttt{archive/}. A fully
+pre-rendered evaluation built on canned camera trajectories rendered to
+MP4 surfaced the exact limitation that motivated the streaming
+approach --- participants could not probe the artifacts they wanted to
+talk about. A second attempt used Xvfb plus each renderer's native UI,
+with \texttt{event\_relay.py} translating browser events into
+\texttt{xdotool} keystrokes; this worked end-to-end but the
+screen-capture path added tens of milliseconds, and the design did not
+generalize to running two renderers concurrently because each demanded
+its own X display. The current architecture replaced both.
